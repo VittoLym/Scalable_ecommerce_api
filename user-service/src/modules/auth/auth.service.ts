@@ -1,78 +1,52 @@
-import bcrypt from 'bcrypt';
-import { UserRepository } from '../user/user.repository';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { LoginUserDto } from '../auth/dto/login.dto';
+import bcrypt from 'bcrypt';
 
+@Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private userRepo: UserRepository,
+    private jwtService: JwtService,
   ) {}
-  async register(data: any) {
-    const existingUser = await this.userRepo.findByEmail(data.email)
 
-    if (existingUser) {
-      throw new Error('User already exists');
-    }
-
-    const hashedPassword = await bcrypt.hash(data.password, 10)
-
-    const user = await this.prisma.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          email: data.email,
-          password: hashedPassword,
-          profile: {
-            create: {
-              firstName: data.firstName,
-              lastName: data.lastName,
-              fullName: `${data.firstName} ${data.lastName}`
-            },
-          },
-        },
-        include: { profile: true },
-      });
-
-      await tx.userAuditLog.create({
-        data: {
-          userId: createdUser.id,
-          action: 'REGISTER',
-        },
-      });
-
-      return createdUser;
-    });
-
-    return this.toSafeUser(user)
-  }
-
-  async login(email: string, password: string) {
-    const user = await this.userRepo.findByEmail(email);
-    if (!user) {
-      throw new Error('Invalid credentials');
-    }
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      throw new Error('Account locked temporarily');
-    }
-    const validPassword = await bcrypt.compare(password, user.password!)
-    if (!validPassword) {
-      await this.userRepo.incrementLoginAttempts(user.id);
-      throw new Error('Invalid credentials');
-    }
-
-    await this.userRepo.resetLoginAttempts(user.id);
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        lastLoginAt: new Date(),
+  async login(data: LoginUserDto) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: data.email,
+        deletedAt: null,
+      },
+      include: {
+        profile: true,
       },
     });
 
-    return this.toSafeUser(user)
-  }
+    if (!user || !user.password) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
-  private toSafeUser(user: any) {
-    const { password, ...safeUser } = user
-    return safeUser
+    const isValid = await bcrypt.compare(data.password, user.password);
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload);
+
+    return {
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+    };
   }
 }

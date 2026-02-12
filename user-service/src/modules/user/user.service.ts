@@ -1,19 +1,19 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserResponseDto } from './dto/user-response.dto';
 import { RegisterUserDto } from './dto/user-register.dto';
-import { User } from '@prisma/client';
+import { Prisma, AuthProvider, Role } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { plainToInstance } from 'class-transformer';
 
 export class UserService {
   constructor(private prisma: PrismaService) {}
-  private toResponse(user: User): RegisterUserDto {
-    return plainToInstance(RegisterUserDto, user, {
+  private toResponse(user: any): UserResponseDto {
+    return plainToInstance(UserResponseDto, user, {
       excludeExtraneousValues: true,
     });
   }
+
   async register(data: RegisterUserDto, ip?: string, userAgent?: string) {
-    // 1. Check existing user
     const existingUser = await this.prisma.user.findFirst({
       where: {
         email: data.email,
@@ -25,29 +25,28 @@ export class UserService {
       throw new Error('User already exists');
     }
 
-    // 2. Hash password if local
     let hashedPassword: string | null = null;
 
-    if (data.authProvider === AuthProvider.LOCAL) {
+    if ((data.authProvider ?? AuthProvider.LOCAL) === AuthProvider.LOCAL) {
       if (!data.password) {
         throw new Error('Password is required');
       }
-      hashedPassword = await bcrypt.hash(data.password, 10)
+      hashedPassword = await bcrypt.hash(data.password, 10);
+      console.log(hashedPassword);
     }
 
-    // 3. Create user + profile in transaction
     const user = await this.prisma.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
         data: {
           email: data.email,
           password: hashedPassword,
           authProvider: data.authProvider ?? AuthProvider.LOCAL,
-          role: data.role ?? 'USER',
+          role: data.role ?? Role.USER,
           profile: {
             create: {
               firstName: data.firstName,
               lastName: data.lastName,
-              fullName: `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim()
+              fullName: `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim(),
             },
           },
         },
@@ -65,10 +64,10 @@ export class UserService {
         },
       });
 
-      return createdUser
+      return createdUser;
     });
 
-    return this.toSafeUser(user)
+    return this.toResponse(user);
   }
 
   async findById(userId: string) {
