@@ -2,14 +2,17 @@ version: '3.8'
 
 services:
 
+  # -------------------------
+  # USER DATABASE
+  # -------------------------
   user-db:
     image: postgres:15
     container_name: user-db
     restart: always
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: userdb
+      PGUSER: user
+      PGPASSWORD: password
+      PGDATABASE: userdb
     ports:
       - "5433:5432"
     volumes:
@@ -26,5 +29,67 @@ services:
     ports:
       - "3001:3000"
 
+
+
+  # -------------------------
+  # PRODUCT DATABASE
+  # -------------------------
+  product-db:
+    image: postgres:15
+    container_name: product-db
+    restart: always
+    environment:
+      PGUSER: user
+      PGPASSWORD: password
+      PGDATABASE: productdb
+    ports:
+      - "5434:5432"
+    volumes:
+      - product_data:/var/lib/postgresql/data
+
+  product-service:
+    build: ./product-service
+    container_name: product-service
+    restart: always
+    depends_on:
+      - product-db
+    env_file:
+      - ./product-service/.env
+    ports:
+      - "3002:3000"
+
+
+
+  # -------------------------
+  # ORDER DATABASE
+  # -------------------------
+  order-db:
+    image: postgres:15
+    container_name: order-db
+    restart: always
+    environment:
+      PGUSER: user
+      PGPASSWORD: password
+      PGDATABASE: orderdb
+    ports:
+      - "5435:5432"
+    volumes:
+      - order_data:/var/lib/postgresql/data
+
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    restart: always
+    depends_on:
+      - order-db
+    env_file:
+      - ./order-service/.env
+    ports:
+      - "3003:3000"
+
+
+
 volumes:
   user_data:
+  product_data:
+  order_data:

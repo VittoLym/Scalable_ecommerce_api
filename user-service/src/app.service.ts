@@ -1,8 +1,120 @@
-import { Injectable } from '@nestjs/common';
+import { PrismaService } from './prisma/prisma.service';
+import bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 
-@Injectable()
-export class AppService {
-  getHello(): string {
-    return 'Hello Users';
+export class UserService {
+  constructor(private prisma: PrismaService) {}
+  async register(data: RegisterUserDto, ip?: string, userAgent?: string) {
+    // 1. Check existing user
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        email: data.email,
+        deletedAt: null,
+      },
+    });
+
+    if (existingUser) {
+      throw new Error('User already exists');
+    }
+
+    // 2. Hash password if local
+    let hashedPassword: string | null = null;
+
+    if (data.authProvider === AuthProvider.LOCAL) {
+      if (!data.password) {
+        throw new Error('Password is required');
+      }
+      hashedPassword = await bcrypt.hash(data.password, 10)
+    }
+
+    // 3. Create user + profile in transaction
+    const user = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: data.email,
+          password: hashedPassword,
+          authProvider: data.authProvider ?? AuthProvider.LOCAL,
+          role: data.role ?? 'USER',
+          profile: {
+            create: {
+              firstName: data.firstName,
+              lastName: data.lastName,
+              fullName: `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim()
+            },
+          },
+        },
+        include: {
+          profile: true,
+        },
+      });
+
+      await tx.userAuditLog.create({
+        data: {
+          userId: createdUser.id,
+          action: 'REGISTER',
+          ipAddress: ip,
+          userAgent,
+        },
+      });
+
+      return createdUser
+    });
+
+    return this.toSafeUser(user)
+  }
+
+  async findById(userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        deletedAt: null,
+      },
+      include: {
+        profile: true,
+        addresses: {
+          where: { deletedAt: null },
+        },
+        paymentMethods: {
+          where: { deletedAt: null },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return this.toSafeUser(user)
+  }
+
+  async softDelete(userId: string) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { deletedAt: new Date() },
+      });
+
+      await tx.userSession.updateMany({
+        where: { userId },
+        data: { revokedAt: new Date() },
+      });
+
+      await tx.userAuditLog.create({
+        data: {
+          userId,
+          action: 'SOFT_DELETE',
+        },
+      });
+    });
+
+    return { success: true };
+  }
+
+  private toSafeUser(user: any) {
+    const { password, ...safeUser } = user
+    return safeUser
+  }
+  getHello() {
+    return 'helllo';
   }
 }
