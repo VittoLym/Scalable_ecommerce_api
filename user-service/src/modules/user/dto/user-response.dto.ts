@@ -1,6 +1,7 @@
-import { Exclude, Expose } from 'class-transformer';
+import { Expose } from 'class-transformer';
+import { Role, AuthProvider } from '@prisma/client';
 
-export class RegisterUserDto {
+export class UserResponseDto {
   @Expose()
   id: string;
 
@@ -8,16 +9,10 @@ export class RegisterUserDto {
   email: string;
 
   @Expose()
-  role: string;
+  role: Role;
 
   @Expose()
-  status: string;
-
-  @Expose()
-  firstName?: string;
-
-  @Expose()
-  lastName?: string;
+  authProvider: AuthProvider;
 
   @Expose()
   createdAt: Date;
@@ -25,11 +20,10 @@ export class RegisterUserDto {
   @Expose()
   updatedAt: Date;
 
-  // Nunca exponer password
-  @Exclude()
-  password: string;
-
-  constructor(partial: Partial<RegisterUserDto>) {
-    Object.assign(this, partial);
-  }
+  @Expose()
+  profile?: {
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+  };
 }

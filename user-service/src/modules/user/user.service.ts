@@ -1,5 +1,6 @@
 import { PrismaService } from '../../prisma/prisma.service';
-import { RegisterUserDto } from './dto/user-response.dto';
+import { UserResponseDto } from './dto/user-response.dto';
+import { RegisterUserDto } from './dto/user-register.dto';
 import { User } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { plainToInstance } from 'class-transformer';
