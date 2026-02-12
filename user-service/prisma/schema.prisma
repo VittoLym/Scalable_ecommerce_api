@@ -1,0 +1,254 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum Role {
+  USER
+  ADMIN
+  SELLER
+  MODERATOR
+  SUPPORT
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  FACEBOOK
+  GITHUB
+  APPLE
+}
+
+model User {
+  id                 String        @id @default(uuid())
+  email              String        @unique
+  password           String?       // Nullable para OAuth users
+  role               Role          @default(USER)
+  status             UserStatus    @default(PENDING_VERIFICATION)
+  authProvider       AuthProvider  @default(LOCAL)
+  providerId         String?       // ID del usuario en el proveedor OAuth
+  emailVerified      Boolean       @default(false)
+  emailVerifiedAt    DateTime?
+  
+  // Profile information
+  profile            Profile?
+  addresses          Address[]
+  paymentMethods     PaymentMethod[]
+  
+  // Audit fields
+  lastLoginAt        DateTime?
+  lastLoginIp        String?
+  loginAttempts      Int           @default(0)
+  lockedUntil        DateTime?
+  
+  // Timestamps
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?     @map("deleted_at") // Soft delete
+  
+  // Relations with other microservices (eventual consistency)
+  cartId             String?       // Reference to cart-service
+  wishlistIds        String[]      // Reference to wishlist-service
+  user_audit_logs UserAuditLog[]
+  user_sessions UserSession[]
+  wishlist_items WishlistItem[]
+  
+  @@unique([email, deletedAt])
+  @@index([email])
+  @@index([status])
+  @@index([role])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Profile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  firstName     String?
+  lastName      String?
+  fullName      String?  @default("")
+  phoneNumber   String?
+  dateOfBirth   DateTime?
+  avatarUrl     String?
+  
+  // Preferences
+  language      String   @default("es")
+  currency      String   @default("USD")
+  newsletter    Boolean  @default(false)
+  
+  // Metadata
+  bio           String?
+  website       String?
+  company       String?
+  taxId         String?  // VAT, RUC, etc.
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([userId])
+  @@map("profiles")
+}
+
+model Address {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type          AddressType @default(SHIPPING)
+  isDefault     Boolean  @default(false)
+  
+  // Address fields
+  fullName      String
+  street        String
+  streetNumber  String?
+  complement    String?
+  neighborhood  String?
+  city          String
+  state         String
+  country       String
+  postalCode    String
+  phoneNumber   String?
+  
+  // Additional info
+  instructions  String?
+  latitude      Float?
+  longitude     Float?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime? @map("deleted_at")
+
+  paymentmethods PaymentMethod[]
+  
+  @@unique([userId, isDefault, type], name: "unique_default_address_per_type")
+  @@index([userId])
+  @@index([country, city])
+  @@map("addresses")
+}
+
+enum AddressType {
+  SHIPPING
+  BILLING
+  BOTH
+}
+
+model PaymentMethod {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type          PaymentMethodType
+  provider      PaymentProvider
+  isDefault     Boolean  @default(false)
+  
+  // Tokenized payment info (never store raw data)
+  token         String   // Reference to payment-service token
+  last4         String?  // Last 4 digits
+  cardBrand     String?  // Visa, MC, etc.
+  expiryMonth   Int?
+  expiryYear    Int?
+  holderName    String?
+  
+  // Billing address reference
+  billingAddressId String?
+  billingAddress   Address? @relation(fields: [billingAddressId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime? @map("deleted_at")
+  
+  @@index([userId])
+  @@map("payment_methods")
+}
+
+enum PaymentMethodType {
+  CREDIT_CARD
+  DEBIT_CARD
+  PAYPAL
+  BANK_TRANSFER
+  CRYPTO
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYPAL
+  MERCADOPAGO
+  OTHER
+}
+
+// Audit logs for security
+model UserAuditLog {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  
+  action        String   // LOGIN, LOGOUT, PASSWORD_CHANGE, PROFILE_UPDATE, etc.
+  ipAddress     String?
+  userAgent     String?
+  metadata      Json?
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@map("user_audit_logs")
+}
+
+// Session management for better scalability
+model UserSession {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  token         String   @unique
+  refreshToken  String?  @unique
+  ipAddress     String?
+  userAgent     String?
+  
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  lastActiveAt  DateTime @default(now())
+  revokedAt     DateTime?
+  
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+// Wishlist items (consistency with wishlist-service)
+model WishlistItem {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  productId     String   // Reference to product-service
+  productSku    String?
+  addedAt       DateTime @default(now())
+  
+  // Metadata for eventual consistency
+  productSnapshot Json?  // Store basic product info at time of adding
+  
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+  @@map("wishlist_items")
+}
