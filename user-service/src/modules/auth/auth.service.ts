@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
-import { UserRepository } from './app.repository';
-import { PrismaService } from './prisma/prisma.service';
+import { UserRepository } from '../user/user.repository';
+import { PrismaService } from '../../prisma/prisma.service';
 
 export class AuthService {
   constructor(

@@ -1,9 +1,16 @@
-import { PrismaService } from './prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { RegisterUserDto } from './dto/user-response.dto';
+import { User } from '@prisma/client';
 import bcrypt from 'bcrypt';
-import { randomUUID } from 'crypto';
+import { plainToInstance } from 'class-transformer';
 
 export class UserService {
   constructor(private prisma: PrismaService) {}
+  private toResponse(user: User): RegisterUserDto {
+    return plainToInstance(RegisterUserDto, user, {
+      excludeExtraneousValues: true,
+    });
+  }
   async register(data: RegisterUserDto, ip?: string, userAgent?: string) {
     // 1. Check existing user
     const existingUser = await this.prisma.user.findFirst({
