@@ -114,7 +114,7 @@ export class AuthService {
     }
   }
   private generateAccessToken(payload: object) {
-    return this.jwt.sign({
+    return this.jwtService.sign({
       payload,
       options: {
         secret: process.env.JWT_SECRET,
@@ -123,7 +123,7 @@ export class AuthService {
     });
   }
   private generateRefreshToken(payload: object) {
-    return this.jwt.sign({
+    return this.jwtService.sign({
       payload: { ...payload, tokenType: 'refresh' },
       options: {
         secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
