@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginUserDto } from '../auth/dto/login.dto';
 import bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -29,6 +30,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      jti: randomUUID(),
     };
     const accessToken = await this.jwtService.signAsync(payload);
     const refreshToken: string = await this.jwtService.signAsync(payload, {

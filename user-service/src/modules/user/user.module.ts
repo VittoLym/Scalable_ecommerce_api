@@ -5,8 +5,10 @@ import { UserController } from './user.controller';
 import { APP_GUARD } from '@nestjs/core';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
+  imports: [RedisModule],
   controllers: [UserController],
   providers: [
     UserService,
