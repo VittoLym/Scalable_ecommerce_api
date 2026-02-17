@@ -28,9 +28,6 @@ export class AdminService {
       where: { id: sessionId },
       data: { revokedAt: new Date() },
     });
-    if (session.accessJti) {
-      await this.redisService.blacklistToken(session.accessJti, 900); // 15 min
-    }
     return session;
   }
   async revokeAllSessions(userId: string) {

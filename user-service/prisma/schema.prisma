@@ -43,6 +43,7 @@ model User {
   verificationToken       String?
   passwordResetToken      String?
   passwordResetExpiresAt  DateTime?
+
   
   // Profile information
   profile            Profile?
@@ -66,6 +67,7 @@ model User {
   user_audit_logs UserAuditLog[]
   user_sessions UserSession[]
   wishlist_items WishlistItem[]
+  AuditLog AuditLog[]
   
   @@unique([email, deletedAt])
   @@index([email])
@@ -146,6 +148,31 @@ enum AddressType {
   SHIPPING
   BILLING
   BOTH
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    AuditLogAction @default(REGISTER)
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+enum AuditLogAction {
+  REGISTER
+  EMAIL_VERIFIED
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_RESET_REQUEST
+  PASSWORD_RESET_SUCCESS
+  SESSION_REVOKED
+  REUSE_ATTACK_DETECTED
+  ADMIN_FORCE_LOGOUT
 }
 
 model PaymentMethod {

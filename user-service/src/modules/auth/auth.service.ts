@@ -88,6 +88,14 @@ export class AuthService {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
+    await this.prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'LOGIN_SUCCESS',
+        ipAddress: ip,
+        userAgent,
+      },
+    });
     return {
       accessToken,
       refreshToken,
@@ -213,8 +221,8 @@ export class AuthService {
       await this.prisma.user.update({
         where: { id: user.id },
         data: {
-          resetPasswordToken: token,
-          resetPasswordExpires: new Date(Date.now() + 3600000), // 1 hora
+          passwordResetToken: token,
+          passwordResetExpires: new Date(Date.now() + 3600000), // 1 hora
         },
       });
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
