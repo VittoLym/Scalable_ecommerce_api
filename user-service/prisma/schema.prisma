@@ -40,6 +40,9 @@ model User {
   emailVerified      Boolean       @default(false)
   emailVerifiedAt    DateTime?
   verificationExpiresAt   DateTime?
+  verificationToken       String?
+  passwordResetToken      String?
+  passwordResetExpiresAt  DateTime?
   
   // Profile information
   profile            Profile?

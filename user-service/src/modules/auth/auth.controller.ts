@@ -8,6 +8,7 @@ import {
   HttpException,
   HttpStatus,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
@@ -19,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { AuthGuard } from '@nestjs/passport';
 import { randomBytes } from 'crypto';
+import { ForgotPasswordDto } from './dto/forgot-password';
 
 @UseGuards(JwtAuthGuard)
 @Controller('auth')
@@ -61,6 +63,11 @@ export class AuthController {
       );
     }
   }
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string) {
+    const user = await this.authService.verifyEmail(token);
+    return user;
+  }
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
   getProfile(@CurrentUser() user: any) {
@@ -102,5 +109,30 @@ export class AuthController {
     });
 
     return this.authService.logout(refreshToken);
+  }
+  @Post('forgot-password')
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    try {
+      await this.authService.sendPasswordResetEmail(forgotPasswordDto.email);
+      return {
+        success: true,
+        message:
+          'Si el email existe, recibirás un enlace para restablecer tu contraseña',
+      };
+    } catch (error) {
+      return {
+        success: true,
+        message:
+          'Si el email existe, recibirás un enlace para restablecer tu contraseña',
+      };
+    }
+  }
+  @Post('reset-password')
+  async resetPassword(
+    @Body('token') token: string,
+    @Body('password') newPassword: string,
+  ) {
+    const user = await  this.authService.resetPassword(token, newPassword);
+    return user;
   }
 }
