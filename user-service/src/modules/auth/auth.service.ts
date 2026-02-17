@@ -11,7 +11,39 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {}
+  private users = [];
+  async findByEmail(email: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: email,
+      },
+    });
+    return user;
+  }
 
+  async create(userData: any) {
+    const newUser = {
+      id: Date.now(),
+      ...userData,
+      createdAt: new Date(),
+    };
+    const user = await this.prisma.user.create(newUser);
+    return newUser;
+  }
+
+  async hashPassword(password: string): Promise<string> {
+    const saltRounds = 10;
+    return bcrypt.hash(password, saltRounds);
+  }
+
+  async validateUser(email: string, password: string) {
+    const user = await this.findByEmail(email);
+    if (user && await bcrypt.compare(password, user.password)) {
+      const { password, ...result } = user;
+      return result;
+    }
+    return null;
+  }
   async login(data: LoginUserDto, ip?: string, userAgent?: string) {
     const user = await this.prisma.user.findFirst({
       where: {
@@ -26,11 +58,12 @@ export class AuthService {
     if (!isValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    const jti = randomUUID();
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
-      jti: randomUUID(),
+      jti,
     };
     const accessToken = await this.jwtService.signAsync(payload);
     const refreshToken: string = await this.jwtService.signAsync(payload, {
@@ -45,6 +78,7 @@ export class AuthService {
         token: accessToken,
         ipAddress: ip,
         userAgent,
+        accessJti:jti,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });

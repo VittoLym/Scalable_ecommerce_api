@@ -39,6 +39,7 @@ model User {
   providerId         String?       // ID del usuario en el proveedor OAuth
   emailVerified      Boolean       @default(false)
   emailVerifiedAt    DateTime?
+  verificationExpiresAt   DateTime?
   
   // Profile information
   profile            Profile?
@@ -216,6 +217,7 @@ model UserSession {
   refreshToken  String?  @unique
   ipAddress     String?
   userAgent     String?
+  accessJti     String?
   
   expiresAt     DateTime
   createdAt     DateTime @default(now())

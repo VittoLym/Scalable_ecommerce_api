@@ -1,13 +1,24 @@
-import { Controller, Post, Body, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Req,
+  Res,
+  Get,
+  HttpException,
+  HttpStatus,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginUserDto } from '../auth/dto/login.dto';
-import { UseGuards, Get } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { RegisterDto } from './dto/register.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { AuthGuard } from '@nestjs/passport';
+import { randomBytes } from 'crypto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('auth')
@@ -18,10 +29,45 @@ export class AuthController {
   login(@Body() data: LoginUserDto) {
     return this.authService.login(data);
   }
-  @Get('me')
   @Post('register')
-  regisrter(@CurrentUser() user: any, @Body() data: RegisterDto) {
-    console.log(data, user);
+  async register(@Body() registerDto: RegisterDto) {
+    try {
+      const existingUser = await this.authService.findByEmail(
+        registerDto.email,
+      );
+      if (existingUser) {
+        throw new HttpException('El usuario ya existe', HttpStatus.CONFLICT);
+      }
+      const verificationToken = randomBytes(32).toString('hex');
+      const hashedPassword = await this.authService.hashPassword(
+        registerDto.password,
+      );
+      const newUser = await this.authService.create({
+        ...registerDto,
+        password: hashedPassword,
+        verificationToken,
+        verificationExpiresAt: new Date(Date.now() + 1000 * 60 * 60),
+      });
+      const { password, ...result } = newUser;
+      return {
+        success: true,
+        message: 'Usuario registrado exitosamente',
+        data: result,
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Error al registrar el usuario',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  getProfile(@CurrentUser() user: any) {
+    return {
+      success: true,
+      data: user,
+    };
   }
   @Roles(Role.ADMIN)
   @Post('admin')
