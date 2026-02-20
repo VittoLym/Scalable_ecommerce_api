@@ -19,7 +19,6 @@ export class ProductProxyController {
       });
 
       return res.status(response.status).json(response.data);
-
     } catch (error: any) {
       return res
         .status(error.response?.status || 500)
