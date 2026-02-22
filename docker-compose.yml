@@ -80,12 +80,17 @@ services:
     build: ./order-service
     container_name: order-service
     restart: always
-    depends_on:
-      - order-db
-    env_file:
-      - ./order-service/.env
     ports:
-      - "3003:3000"
+      - "3003:3003"
+    environment:
+      DATABASE_URL: postgresql://user:password@order-db:5432/orderdb
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      SERVICE_NAME: order-service
+    depends_on:
+      - rabbitmq
+      - order-db
+    networks:
+      - ecommerce-networks
 
   api-gateway:
     build: ./api-gateway

@@ -7,8 +7,9 @@ export class ProxyService {
   constructor(private readonly httpService: HttpService) {}
 
   private readonly services = {
-    user: 'http://user-service:3001', // Nombre del contenedor Docker
+    user: 'http://user-service:3001',
     product: 'http://product-service:3002',
+    order: 'http://order-service:3003', // Añadir
   };
 
   async forwardRequest(service: string, path: string, method: string, data?: any) {
