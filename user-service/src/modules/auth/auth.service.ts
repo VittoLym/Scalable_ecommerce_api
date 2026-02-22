@@ -84,7 +84,7 @@ export class AuthService {
         token: accessToken,
         ipAddress: ip,
         userAgent,
-        accessJti:jti,
+        accessJti: jti,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
@@ -222,7 +222,7 @@ export class AuthService {
         where: { id: user.id },
         data: {
           passwordResetToken: token,
-          passwordResetExpires: new Date(Date.now() + 3600000), // 1 hora
+          passwordResetExpiresAt: new Date(Date.now() + 3600000), // 1 hora
         },
       });
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;

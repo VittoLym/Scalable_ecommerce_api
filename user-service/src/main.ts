@@ -4,11 +4,12 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
   const app = await NestFactory.create(UserModule);
-  // Configurar como microservicio RabbitMQ
+  const rabbitmqHost =
+    process.env.NODE_ENV === 'production' ? 'rabbitmq' : 'localhost';
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
-      urls: ['amqp://rabbitmq:5672'],
+      urls: [`amqp://${rabbitmqHost}:5672`],
       queue: 'user_service_queue',
       queueOptions: {
         durable: false,

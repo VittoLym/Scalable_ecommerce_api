@@ -13,7 +13,10 @@ export class EventsController {
    * Escuchar confirmación de pago
    */
   @EventPattern('payment.confirmed')
-  async handlePaymentConfirmed(@Payload() data: any, @Ctx() context: RmqContext) {
+  async handlePaymentConfirmed(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
     this.logger.log('💰 Payment confirmed event received:', data);
 
     const { orderId, paymentId } = data;
