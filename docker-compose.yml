@@ -1,6 +1,26 @@
 version: '3.8'
 
 services:
+  # -------------------------
+  # RABBITMQ (agregado)
+  # -------------------------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"      # Puerto para conexiones AMQP
+      - "15672:15672"    # Puerto para interfaz web de management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - ecommerce-networks
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # -------------------------
   # USER DATABASE
@@ -10,13 +30,15 @@ services:
     container_name: user-db
     restart: always
     environment:
-      PGUSER: user
-      PGPASSWORD: password
-      PGDATABASE: userdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: userdb
     ports:
       - "5433:5432"
     volumes:
       - user_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-networks
 
   user-service:
     build: ./user-service
@@ -24,12 +46,15 @@ services:
     restart: always
     depends_on:
       - user-db
+      - rabbitmq
     env_file:
       - ./user-service/.env
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
     ports:
       - "3001:3000"
-
-
+    networks:
+      - ecommerce-networks
 
   # -------------------------
   # PRODUCT DATABASE
@@ -39,13 +64,15 @@ services:
     container_name: product-db
     restart: always
     environment:
-      PGUSER: user
-      PGPASSWORD: password
-      PGDATABASE: productdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: productdb
     ports:
       - "5434:5432"
     volumes:
       - product_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-networks
 
   product-service:
     build: ./product-service
@@ -53,12 +80,15 @@ services:
     restart: always
     depends_on:
       - product-db
+      - rabbitmq
     env_file:
       - ./product-service/.env
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
     ports:
       - "3002:3000"
-
-
+    networks:
+      - ecommerce-networks
 
   # -------------------------
   # ORDER DATABASE
@@ -68,13 +98,15 @@ services:
     container_name: order-db
     restart: always
     environment:
-      PGUSER: user
-      PGPASSWORD: password
-      PGDATABASE: orderdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: orderdb
     ports:
       - "5435:5432"
     volumes:
       - order_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-networks
 
   order-service:
     build: ./order-service
@@ -100,8 +132,16 @@ services:
     depends_on:
       - user-service
       - product-service
+      - order-service
+    networks:
+      - ecommerce-networks
 
-
+# -------------------------
+# NETWORKS (definición agregada)
+# -------------------------
+networks:
+  ecommerce-networks:
+    driver: bridge
 
 volumes:
   user_data:
