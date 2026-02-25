@@ -14,7 +14,6 @@ export class UserService {
       excludeExtraneousValues: true,
     });
   }
-
   async register(data: RegisterUserDto, ip?: string, userAgent?: string) {
     const existingUser = await this.prisma.user.findFirst({
       where: {
@@ -34,7 +33,6 @@ export class UserService {
         throw new Error('Password is required');
       }
       hashedPassword = await bcrypt.hash(data.password, 10);
-      console.log(hashedPassword);
     }
 
     const user = await this.prisma.$transaction(async (tx) => {
@@ -71,7 +69,6 @@ export class UserService {
 
     return this.toResponse(user);
   }
-
   async findById(userId: string) {
     const user = await this.prisma.user.findFirst({
       where: {
@@ -95,7 +92,6 @@ export class UserService {
 
     return this.toSafeUser(user)
   }
-
   async softDelete(userId: string) {
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({

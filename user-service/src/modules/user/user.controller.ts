@@ -105,18 +105,15 @@ export class UserController {
     );
     return user;
   }
-
   @Get(':id')
   async findById(@Param('id') id: string): Promise<any> {
     return this.userService.findById(id);
   }
-
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async softDelete(@Param('id') id: string): Promise<void> {
     await this.userService.softDelete(id);
   }
-
   @MessagePattern('get_user_by_id')
   async handleGetUserById(@Payload() data: { userId: string }) {
     try {
