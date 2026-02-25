@@ -15,18 +15,81 @@ import { UserService } from './user.service';
 import { RegisterUserDto } from './dto/user-register.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import type { Request } from 'express';
+import { RedisService } from '../redis/redis.service';
 
 @Controller('users')
 export class UserController {
   constructor(
     private readonly userService: UserService,
     @Inject('ORDER_SERVICE') private orderClient: ClientProxy, // Opcional: para comunicarse con order-service
+    private readonly redisService: RedisService,
   ) {}
-
-  // =========================================
-  // ENDPOINTS REST HTTP
-  // =========================================
-
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  async healthCheck() {
+    const healthStatus = {
+      status: 'ok',
+      service: 'user-service',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      dependencies: {
+        database: 'unknown',
+        rabbitmq: 'unknown',
+        redis: 'unknown',
+      },
+    };
+    try {
+      await this.userService.checkDatabaseConnection();
+      healthStatus.dependencies.database = 'connected';
+    } catch (error) {
+      healthStatus.dependencies.database = 'disconnected';
+      healthStatus.status = 'degraded';
+    }
+    try {
+      if (this.orderClient) {
+        await this.orderClient.connect();
+        healthStatus.dependencies.rabbitmq = 'connected';
+      }
+    } catch (error) {
+      healthStatus.dependencies.rabbitmq = 'disconnected';
+      healthStatus.status = 'degraded';
+    }
+    try {
+      const redis = (this.redisService as any).redis; // Acceder al cliente Redis internamente
+      if (redis) {
+        const pingResult = await redis.ping();
+        healthStatus.dependencies.redis =
+          pingResult === 'PONG' ? 'connected' : 'error';
+      } else {
+        healthStatus.dependencies.redis = 'not_available';
+      }
+    } catch (error) {
+      healthStatus.dependencies.redis = 'disconnected';
+      healthStatus.status = 'degraded';
+    }
+    return healthStatus;
+  }
+  @Get('redis-test')
+  async testRedis() {
+    try {
+      const testJti = 'test-token-123';
+      await this.redisService.blacklistToken(testJti, 60); // Expira en 60 segundos
+      const isBlacklisted = await this.redisService.isBlacklisted(testJti);
+      return {
+        message: 'Redis funcionando!',
+        test: {
+          token: testJti,
+          isBlacklisted: isBlacklisted,
+        },
+      };
+    } catch (error) {
+      return {
+        error: 'Error conectando a Redis',
+        details: error.message,
+      };
+    }
+  }
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(
@@ -54,23 +117,6 @@ export class UserController {
     await this.userService.softDelete(id);
   }
 
-  @Get('health')
-  healthCheck() {
-    return {
-      status: 'ok',
-      service: 'user-service',
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  // =========================================
-  // HANDLERS PARA MENSAJES DE MICROSERVICIOS (RabbitMQ)
-  // =========================================
-
-  /**
-   * Handler para obtener usuario por ID (usado por otros microservicios)
-   * Escucha el patrón 'get_user_by_id' en RabbitMQ
-   */
   @MessagePattern('get_user_by_id')
   async handleGetUserById(@Payload() data: { userId: string }) {
     try {

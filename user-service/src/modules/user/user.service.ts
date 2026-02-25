@@ -4,7 +4,9 @@ import { RegisterUserDto } from './dto/user-register.dto';
 import { AuthProvider, Role } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { plainToInstance } from 'class-transformer';
+import { Injectable } from '@nestjs/common';
 
+@Injectable()
 export class UserService {
   constructor(private prisma: PrismaService) {}
   private toResponse(user: any): UserResponseDto {
@@ -121,7 +123,17 @@ export class UserService {
     const { password, ...safeUser } = user
     return safeUser
   }
-  getHello() {
-    return 'helllo';
+  async checkDatabaseConnection(): Promise<boolean> {
+    if (!this.prisma) {
+      console.error('Prisma is undefined in checkDatabaseConnection');
+      throw new Error('Prisma service not initialized');
+    }
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return true;
+    } catch (error) {
+      console.log(error);
+      throw new Error('Database connection failed');
+    }
   }
 }

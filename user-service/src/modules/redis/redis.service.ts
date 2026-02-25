@@ -1,3 +1,4 @@
+// user-service/src/modules/redis/redis.service.ts
 import Redis from 'ioredis';
 import { Injectable } from '@nestjs/common';
 
@@ -14,5 +15,15 @@ export class RedisService {
 
   async isBlacklisted(jti: string) {
     return (await this.redis.get(`bl:${jti}`)) !== null;
+  }
+
+  // Nuevo método para health check
+  async ping(): Promise<boolean> {
+    try {
+      const result = await this.redis.ping();
+      return result === 'PONG';
+    } catch (error) {
+      return false;
+    }
   }
 }
