@@ -23,7 +23,6 @@ export class AuthService {
     });
     return user;
   }
-
   async create(userData: any) {
     const newUser = {
       id: Date.now(),
@@ -33,12 +32,10 @@ export class AuthService {
     const user = await this.prisma.user.create(newUser);
     return newUser;
   }
-
   async hashPassword(password: string): Promise<string> {
     const saltRounds = 10;
     return bcrypt.hash(password, saltRounds);
   }
-
   async validateUser(email: string, password: string) {
     const user = await this.findByEmail(email);
     if (user && await bcrypt.compare(password, user.password)) {
@@ -48,6 +45,7 @@ export class AuthService {
     return null;
   }
   async login(data: LoginUserDto, ip?: string, userAgent?: string) {
+    console.log(data);
     const user = await this.prisma.user.findFirst({
       where: {
         email: data.email,

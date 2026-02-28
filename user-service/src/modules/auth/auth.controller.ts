@@ -9,6 +9,9 @@ import {
   HttpStatus,
   UseGuards,
   Query,
+  Ip,
+  Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
 import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
@@ -28,8 +31,39 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
-  login(@Body() data: LoginUserDto) {
-    return this.authService.login(data);
+  async login(
+    @Body() data: LoginUserDto,
+    @Ip() ip?: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    try {
+      console.log('Login attempt:', { email: data.email, ip, userAgent });
+      const result = await this.authService.login(data, ip, userAgent);
+      console.log('Login successful:', { email: data.email });
+      return {
+        success: true,
+        message: 'Login exitoso',
+        data: result,
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('Login error:', {
+          email: data.email,
+          error: error.message,
+        });
+      }
+
+      if (error instanceof UnauthorizedException) {
+        throw new HttpException(
+          error.message || 'Credenciales inválidas',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+      throw new HttpException(
+        'Error en el servidor',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
   @Post('register')
   async register(@Body() registerDto: RegisterDto) {

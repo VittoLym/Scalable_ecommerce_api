@@ -7,9 +7,18 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RedisModule } from '../redis/redis.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { AuthController } from '../auth/auth.controller';
+import { AuthService } from '../auth/auth.service';
+import { AuthModule } from '../auth/auth.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
+    JwtModule.register({
+      // ← Registrar JwtModule globalmente
+      secret: process.env.JWT_SECRET || 'super-secret-key',
+      signOptions: { expiresIn: '15m' },
+    }),
     ClientsModule.register([
       {
         name: 'ORDER_SERVICE',
@@ -24,11 +33,13 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
       },
     ]),
     RedisModule,
+    AuthModule,
   ],
-  controllers: [UserController],
+  controllers: [UserController, AuthController],
   providers: [
     UserService,
     UserRepository,
+    AuthService,
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
