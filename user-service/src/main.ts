@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { UserModule } from './modules/user/user.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { AllExceptionsFilter } from '../src/common/filters/http-expetions.filter';
+import { ResponseInterceptor } from '../src/common/interceptors/response-interceptos';
 
 async function bootstrap() {
   const app = await NestFactory.create(UserModule);
@@ -16,7 +18,8 @@ async function bootstrap() {
       },
     },
   });
-
+  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalInterceptors(new ResponseInterceptor());
   app.enableCors();
   await app.startAllMicroservices();
   await app.listen(3001);

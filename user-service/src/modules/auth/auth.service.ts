@@ -2,14 +2,26 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginUserDto } from '../auth/dto/login.dto';
 import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
+import {
+  InvalidCredentialsException,
+  EmailNotVerifiedException,
+  UserAlreadyExistsException,
+  UserNotFoundException,
+  TokenBlacklistedException,
+  InvalidTokenException,
+  DatabaseException,
+} from '../../common/exceptions/custom-exception';
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -45,59 +57,82 @@ export class AuthService {
     return null;
   }
   async login(data: LoginUserDto, ip?: string, userAgent?: string) {
-    console.log(data);
-    const user = await this.prisma.user.findFirst({
-      where: {
-        email: data.email,
-        deletedAt: null,
-      },
-    });
-    if (!user || !user.password) {
-      throw new UnauthorizedException('Invalid credentials');
+    try {
+      this.logger.log(`Intento de login para email: ${data.email}`);
+      const user = await this.prisma.user.findFirst({
+        where: {
+          email: data.email,
+          deletedAt: null,
+        },
+      });
+      if (!user || !user.password) {
+        throw new InvalidCredentialsException({ email: data.email });
+      }
+      if (!user.emailVerified) {
+        throw new EmailNotVerifiedException({ email: data.email });
+      }
+      const isValid = await bcrypt.compare(data.password, user.password);
+      if (!isValid) {
+        throw new InvalidCredentialsException({ email: data.email });
+      }
+      const jti = randomUUID();
+      const payload = {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        jti,
+      };
+      const [accessToken, refreshToken] = await Promise.all([
+        this.jwtService.signAsync(payload),
+        this.jwtService.signAsync(payload, {
+          secret: process.env.JWT_REFRESH_SECRET,
+          expiresIn: '7d',
+        }),
+      ]);
+      const hashedRefresh = await bcrypt.hash(refreshToken, 10);
+      await this.prisma.$transaction(async (tx) => {
+        await tx.userSession.create({
+          data: {
+            userId: user.id,
+            refreshToken: hashedRefresh,
+            token: accessToken,
+            ipAddress: ip,
+            userAgent,
+            accessJti: jti,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            userId: user.id,
+            action: 'LOGIN_SUCCESS',
+            ipAddress: ip,
+            userAgent,
+          },
+        });
+      });
+      this.logger.log(`Login exitoso para usuario: ${user.id}`);
+      return {
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error en login: ${error.message}`, error.stack);
+      if (
+        error instanceof InvalidCredentialsException ||
+        error instanceof EmailNotVerifiedException
+      ) {
+        throw error;
+      }
+      throw new DatabaseException('Error al procesar el login', {
+        originalError: error.message 
+      });
     }
-    if (!user.emailVerified) {
-      throw new UnauthorizedException('Email not verified');
-    }
-    const isValid = await bcrypt.compare(data.password, user.password);
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-    const jti = randomUUID();
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      jti,
-    };
-    const accessToken = await this.jwtService.signAsync(payload);
-    const refreshToken: string = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_REFRESH_SECRET,
-      expiresIn: '7d',
-    });
-    const hashedRefresh = await bcrypt.hash(refreshToken, 10);
-    await this.prisma.userSession.create({
-      data: {
-        userId: user.id,
-        refreshToken: hashedRefresh,
-        token: accessToken,
-        ipAddress: ip,
-        userAgent,
-        accessJti: jti,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      },
-    });
-    await this.prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: 'LOGIN_SUCCESS',
-        ipAddress: ip,
-        userAgent,
-      },
-    });
-    return {
-      accessToken,
-      refreshToken,
-    };
   }
   async refresh(oldRefreshToken: string) {
     let payload: any;

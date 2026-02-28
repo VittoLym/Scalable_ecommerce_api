@@ -13,10 +13,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    console.log('🔍 JWT Payload recibido:', payload);
+    if (!payload || !payload.jti) {
+      console.log('❌ Payload inválido - no tiene jti');
+      throw new UnauthorizedException('Token inválido');
+    }
     const isBlacklisted = await this.redisService.isBlacklisted(payload.jti);
+    console.log('🔍 Token blacklisted?', isBlacklisted); // ← DEBUG
     if (isBlacklisted) {
+      console.log('❌ Token en blacklist');
       throw new UnauthorizedException('Token blacklisted');
     }
+    console.log('✅ Token válido, usuario:', payload.sub);
     return {
       userId: payload.sub,
       email: payload.email,
