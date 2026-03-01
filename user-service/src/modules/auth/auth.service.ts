@@ -21,6 +21,8 @@ import {
 import { AuthProvider, Role } from '@prisma/client';
 import { UserResponseDto } from '../user/dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
+import { EmailService } from 'src/email/email.service';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -28,6 +30,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
   private users = [];
   async findByEmail(email: string) {
@@ -60,6 +63,8 @@ export class AuthService {
       }
       hashedPassword = await bcrypt.hash(userData.password, 10);
     }
+    const verificationToken = randomBytes(32).toString('hex');
+    const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
     const user = await this.prisma.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
         data: {
@@ -67,11 +72,15 @@ export class AuthService {
           password: hashedPassword,
           authProvider: userData.authProvider ?? AuthProvider.LOCAL,
           role: userData.role ?? Role.USER,
+          emailVerified: false,
+          verificationToken,
+          verificationExpiresAt,
           profile: {
             create: {
               firstName: userData.firstName,
               lastName: userData.lastName,
-              fullName: `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim(),
+              fullName:
+                `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim(),
             },
           },
         },
@@ -89,6 +98,11 @@ export class AuthService {
       });
       return createdUser;
     });
+    await this.emailService.sendVerificationEmail(
+      userData.email,
+      verificationToken,
+      `${userData.firstName} ${userData.lastName}`.trim() || 'usuario',
+    );
     return this.toResponse(user);
   }
   async hashPassword(password: string): Promise<string> {
@@ -121,6 +135,11 @@ export class AuthService {
       const isValid = await bcrypt.compare(data.password, user.password);
       if (!isValid) {
         throw new InvalidCredentialsException({ email: data.email });
+      }
+      if (!user.emailVerified) {
+        throw new UnauthorizedException(
+          'Por favor verifica tu email antes de iniciar sesión',
+        );
       }
       const jti = randomUUID();
       const payload = {

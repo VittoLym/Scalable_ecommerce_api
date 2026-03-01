@@ -11,11 +11,16 @@ import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
+import { EmailModule } from 'src/email/email.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
     JwtModule.register({
-      // ← Registrar JwtModule globalmente
       secret: process.env.JWT_SECRET || 'super-secret-key',
       signOptions: { expiresIn: '15m' },
     }),
@@ -34,6 +39,7 @@ import { JwtModule } from '@nestjs/jwt';
     ]),
     RedisModule,
     AuthModule,
+    EmailModule,
   ],
   controllers: [UserController, AuthController],
   providers: [
@@ -46,6 +52,6 @@ import { JwtModule } from '@nestjs/jwt';
     },
     PrismaService,
   ],
-  exports: [UserService],
+  exports: [UserService, EmailModule],
 })
 export class UserModule {}

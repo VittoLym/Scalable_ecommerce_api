@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifica tu email</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+      border-radius: 10px 10px 0 0;
+    }
+    .content {
+      background: #f9f9f9;
+      padding: 30px;
+      border-radius: 0 0 10px 10px;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 20px 0;
+      font-weight: 500;
+    }
+    .button:hover {
+      opacity: 0.9;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      color: #666;
+      font-size: 14px;
+    }
+    .expiry {
+      background: #fff3cd;
+      border: 1px solid #ffeeba;
+      color: #856404;
+      padding: 10px;
+      border-radius: 5px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>¡Bienvenido a nuestra plataforma!</h1>
+    </div>
+    <div class="content">
+      <h2>Hola {{name}} 👋</h2>
+      <p>Gracias por registrarte. Para completar tu registro y empezar a usar todos nuestros servicios, por favor verifica tu dirección de email haciendo click en el siguiente botón:</p>
+      
+      <div style="text-align: center;">
+        <a href="{{verificationLink}}" class="button">Verificar mi email</a>
+      </div>
+      
+      <div class="expiry">
+        ⏰ Este enlace expirará en <strong>24 horas</strong>
+      </div>
+      
+      <p>Si el botón no funciona, puedes copiar y pegar el siguiente enlace en tu navegador:</p>
+      <p style="word-break: break-all; background: #eee; padding: 10px; border-radius: 5px;">
+        {{verificationLink}}
+      </p>
+      
+      <p>Si no creaste una cuenta, puedes ignorar este email.</p>
+    </div>
+    <div class="footer">
+      <p>© {{year}} Tu Empresa. Todos los derechos reservados.</p>
+      <p style="font-size: 12px; color: #999;">
+        Este es un email automático, por favor no respondas a este mensaje.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
