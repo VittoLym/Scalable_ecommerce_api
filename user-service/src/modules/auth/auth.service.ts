@@ -18,6 +18,9 @@ import {
   InvalidTokenException,
   DatabaseException,
 } from '../../common/exceptions/custom-exception';
+import { AuthProvider, Role } from '@prisma/client';
+import { UserResponseDto } from '../user/dto/user-response.dto';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class AuthService {
@@ -35,14 +38,58 @@ export class AuthService {
     });
     return user;
   }
-  async create(userData: any) {
-    const newUser = {
-      id: Date.now(),
-      ...userData,
-      createdAt: new Date(),
-    };
-    const user = await this.prisma.user.create(newUser);
-    return newUser;
+  private toResponse(user: any): UserResponseDto {
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
+  }
+  async create(userData: any, ip: string, userAgent?: string) {
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        email: userData.email,
+        deletedAt: null,
+      },
+    });
+    if (existingUser) {
+      throw new Error('User already exists');
+    }
+    let hashedPassword: string | null = null;
+    if ((userData.authProvider ?? AuthProvider.LOCAL) === AuthProvider.LOCAL) {
+      if (!userData.password) {
+        throw new Error('Password is required');
+      }
+      hashedPassword = await bcrypt.hash(userData.password, 10);
+    }
+    const user = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: userData.email,
+          password: hashedPassword,
+          authProvider: userData.authProvider ?? AuthProvider.LOCAL,
+          role: userData.role ?? Role.USER,
+          profile: {
+            create: {
+              firstName: userData.firstName,
+              lastName: userData.lastName,
+              fullName: `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim(),
+            },
+          },
+        },
+        include: {
+          profile: true,
+        },
+      });
+      await tx.userAuditLog.create({
+        data: {
+          userId: createdUser.id,
+          action: 'REGISTER',
+          ipAddress: ip,
+          userAgent,
+        },
+      });
+      return createdUser;
+    });
+    return this.toResponse(user);
   }
   async hashPassword(password: string): Promise<string> {
     const saltRounds = 10;

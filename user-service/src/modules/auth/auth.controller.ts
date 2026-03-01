@@ -7,6 +7,7 @@ import {
   Get,
   HttpException,
   HttpStatus,
+  HttpCode,
   UseGuards,
   Query,
   Ip,
@@ -24,8 +25,8 @@ import { Role } from '@prisma/client';
 import { AuthGuard } from '@nestjs/passport';
 import { randomBytes } from 'crypto';
 import { ForgotPasswordDto } from './dto/forgot-password';
+import { UserResponseDto } from '../user/dto/user-response.dto';
 
-@UseGuards(JwtAuthGuard)
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
@@ -66,7 +67,11 @@ export class AuthController {
     }
   }
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
+  @HttpCode(HttpStatus.CREATED)
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Req() req: Request,
+  ): Promise<UserResponseDto> {
     try {
       const existingUser = await this.authService.findByEmail(
         registerDto.email,
@@ -74,22 +79,10 @@ export class AuthController {
       if (existingUser) {
         throw new HttpException('El usuario ya existe', HttpStatus.CONFLICT);
       }
-      const verificationToken = randomBytes(32).toString('hex');
-      const hashedPassword = await this.authService.hashPassword(
-        registerDto.password,
-      );
-      const newUser = await this.authService.create({
-        ...registerDto,
-        password: hashedPassword,
-        verificationToken,
-        verificationExpiresAt: new Date(Date.now() + 1000 * 60 * 60),
-      });
-      const { password, ...result } = newUser;
-      return {
-        success: true,
-        message: 'Usuario registrado exitosamente',
-        data: result,
-      };
+      const ip = req.ip || '0';
+      const userAgent = req.headers['user-agent'] || 'aplication/json';
+      const user = await this.authService.create(registerDto, ip, userAgent);
+      return user;
     } catch (error) {
       throw new HttpException(
         error.message || 'Error al registrar el usuario',
@@ -110,11 +103,13 @@ export class AuthController {
       data: user,
     };
   }
+  @UseGuards(JwtAuthGuard)
   @Roles(Role.ADMIN)
   @Post('admin')
   admin() {
     console.log('acá debería ir el dashboard.');
   }
+  @UseGuards(JwtAuthGuard)
   @Post('refresh')
   async refresh(
     @Req() req: Request,
@@ -131,6 +126,7 @@ export class AuthController {
     });
     return { accessToken };
   }
+  @UseGuards(JwtAuthGuard)
   @Post('logout')
   logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies['refreshToken'] as string;
@@ -144,6 +140,7 @@ export class AuthController {
 
     return this.authService.logout(refreshToken);
   }
+  @UseGuards(JwtAuthGuard)
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     try {
@@ -161,12 +158,13 @@ export class AuthController {
       };
     }
   }
+  @UseGuards(JwtAuthGuard)
   @Post('reset-password')
   async resetPassword(
     @Body('token') token: string,
     @Body('password') newPassword: string,
   ) {
-    const user = await  this.authService.resetPassword(token, newPassword);
+    const user = await this.authService.resetPassword(token, newPassword);
     return user;
   }
 }
