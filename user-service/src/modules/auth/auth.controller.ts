@@ -120,6 +120,8 @@ export class AuthController {
     const token = req.cookies['refreshToken'] || req.body['refreshToken'];
     if (!token) throw new Error('No hay token');
     const { accessToken, refreshToken } = await this.authService.refresh(token);
+    console.log(accessToken);
+    console.log(refreshToken);
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: true,

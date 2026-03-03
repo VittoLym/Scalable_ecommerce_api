@@ -201,10 +201,8 @@ export class AuthService {
     }
   }
   async refresh(oldRefreshToken: string) {
-    console.log(
-      '🔄 Refresh token recibido:',
-      oldRefreshToken.substring(0, 20) + '...',
-    );
+    const decoded = this.jwtService.decode(oldRefreshToken);
+    console.log('📦 Token decodificado (sin verificar):', decoded);
     let payload: any;
     try {
       payload = await this.jwtService.verifyAsync(oldRefreshToken, {
@@ -225,8 +223,14 @@ export class AuthService {
       }
       throw error;
     }
+    const tokens = await this.prisma.userSession.findMany({
+      where: {
+        userId: payload.sub,
+        revokedAt: null,
+      },
+    });
     for (const stored of tokens) {
-      const match = await bcrypt.compare(oldRefreshToken, stored.token);
+      const match = await bcrypt.compare(oldRefreshToken, stored.refreshToken);
       if (!match) continue;
       const user = await this.prisma.user.findFirst({
         where: {
@@ -236,8 +240,19 @@ export class AuthService {
       if (!user) {
         throw new UnauthorizedException('User not found');
       }
-      const newAccessToken = this.generateAccessToken(user);
-      const newRefreshToken = this.generateRefreshToken(user);
+      const session = await this.prisma.userSession.findFirst({
+        where: {
+          userId: stored.userId,
+        },
+      });
+      const pl = {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        jti: session?.accessJti,
+      };
+      const newAccessToken = this.generateAccessToken(pl);
+      const newRefreshToken = this.generateRefreshToken(pl);
       await this.prisma.userSession.update({
         where: {
           id: stored.id,
@@ -295,23 +310,27 @@ export class AuthService {
       });
     }
   }
-  private generateAccessToken(payload: object) {
-    return this.jwtService.sign({
-      payload,
-      options: {
-        secret: process.env.JWT_SECRET,
-        expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
-      },
+  private generateAccessToken(payload: any) {
+    return this.jwtService.sign(payload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' as any,
     });
   }
-  private generateRefreshToken(payload: object) {
-    return this.jwtService.sign({
-      payload: { ...payload, tokenType: 'refresh' },
-      options: {
+  private generateRefreshToken(payload: any) {
+    console.log('🔍 generateRefreshToken - payload recibido:', payload);
+    const token = this.jwtService.sign(
+      { ...payload, tokenType: 'refresh' },
+      {
         secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
-        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' as any,
       },
-    });
+    );
+    const decoded = this.jwtService.decode(token);
+    console.log(
+      '🔍 generateRefreshToken - token generado (decodificado):',
+      decoded,
+    );
+    return token;
   }
   async sendPasswordResetEmail(email: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
