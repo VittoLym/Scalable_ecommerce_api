@@ -3,9 +3,11 @@ import { UserModule } from './modules/user/user.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AllExceptionsFilter } from '../src/common/filters/http-expetions.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response-interceptos';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(UserModule);
+  app.use(cookieParser());
   const rabbitmqHost =
     process.env.NODE_ENV === 'production' ? 'rabbitmq' : 'localhost';
   app.connectMicroservice<MicroserviceOptions>({

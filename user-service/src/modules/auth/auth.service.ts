@@ -201,48 +201,31 @@ export class AuthService {
     }
   }
   async refresh(oldRefreshToken: string) {
+    console.log(
+      '🔄 Refresh token recibido:',
+      oldRefreshToken.substring(0, 20) + '...',
+    );
     let payload: any;
     try {
       payload = await this.jwtService.verifyAsync(oldRefreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
       });
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-    const tokens = await this.prisma.userSession.findMany({
-      where: {
-        userId: payload.sub,
-        revokedAt: null,
-      },
-    });
-    for (const stored of tokens) {
-      const match = await bcrypt.compare(oldRefreshToken, stored.token);
-      if (!match) continue;
-      const user = await this.prisma.user.findFirst({
-        where: {
-          id: stored.userId,
-        },
+    } catch (error) {
+      console.error('❌ Error en refresh:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
       });
-      if (!user) {
-        throw new UnauthorizedException('User not found');
+
+      if (error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Refresh token expirado');
       }
-      const newAccessToken = this.generateAccessToken(user);
-      const newRefreshToken = this.generateRefreshToken(user);
-      await this.prisma.userSession.update({
-        where: {
-          id: stored.id,
-        },
-        data: {
-          token: await bcrypt.hash(newRefreshToken, 10),
-          userId: user.id,
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-        },
-      });
-      return {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-      };
+      if (error.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException('Refresh token inválido');
+      }
+      throw error;
     }
+    console.log('mandarina');
     throw new UnauthorizedException();
   }
   async verifyEmail(token: string) {
