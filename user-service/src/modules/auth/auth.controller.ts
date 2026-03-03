@@ -185,6 +185,7 @@ export class AuthController {
     const requestIp = 
       req.headers['x-forwarded-for']?.toString().split(',')[0] || 
       req.socket.remoteAddress ||
+      req.ip ||
       'IP no disponible';
     const userAgent =
       (req.headers['user-agent'] as string) || 'User-Agent no disponible';
@@ -194,5 +195,33 @@ export class AuthController {
       userAgent,
       requestIp });
     return user;
+  }
+  @Get('info')
+  @HttpCode(HttpStatus.OK)
+  getClientInfo(@Req() req: Request) {
+    console.log(req.ip);
+    const ip =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket.remoteAddress ||
+      req.ip ||
+      'IP no disponible';
+    const userAgent = req.get('user-agent') || 'User-Agent no disponible';
+    const acceptLanguage = req.get('accept-language') || 'No especificado';
+    const method = req.method;
+    const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    const location = this.getLocationFromIp(ip);
+    console.log(location);
+    return {
+      success: true,
+      data: {
+        ip,
+        userAgent,
+        acceptLanguage,
+        method,
+        url: fullUrl,
+        timestamp: new Date().toISOString(),
+        location,
+      },
+    };
   }
 }
