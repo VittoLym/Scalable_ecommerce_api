@@ -4,7 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { RedisService } from '../redis/redis.service';
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy) {
+export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(private redisService: RedisService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -13,6 +13,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    console.log('JWT validate ejecutándose');
+    console.log(payload);
     console.log('🔍 JWT Payload recibido:', payload);
     if (!payload || !payload.jti) {
       console.log('❌ Payload inválido - no tiene jti');

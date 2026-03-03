@@ -23,9 +23,9 @@ import { RegisterDto } from './dto/register.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { AuthGuard } from '@nestjs/passport';
-import { randomBytes } from 'crypto';
 import { ForgotPasswordDto } from './dto/forgot-password';
 import { UserResponseDto } from '../user/dto/user-response.dto';
+import { RolesGuard } from './guards/roles.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -103,11 +103,13 @@ export class AuthController {
       data: user,
     };
   }
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Post('admin')
-  admin() {
+  admin(@Req() req: Request) {
+    console.log(req.user);
     console.log('acá debería ir el dashboard.');
+    return 'admin dashboard';
   }
   @UseGuards(JwtAuthGuard)
   @Post('refresh')

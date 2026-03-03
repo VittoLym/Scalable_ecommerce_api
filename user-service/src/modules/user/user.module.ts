@@ -13,9 +13,12 @@ import { AuthModule } from '../auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
 import { EmailModule } from 'src/email/email.module';
 import { ConfigModule } from '@nestjs/config';
+import { JwtStrategy } from '../auth/jwt.strategy';
+import { PassportModule } from '@nestjs/passport';
 
 @Module({
   imports: [
+    PassportModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -46,11 +49,8 @@ import { ConfigModule } from '@nestjs/config';
     UserService,
     UserRepository,
     AuthService,
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
     PrismaService,
+    JwtStrategy,
   ],
   exports: [UserService, EmailModule],
 })
