@@ -199,7 +199,6 @@ export class AuthController {
   @Get('info')
   @HttpCode(HttpStatus.OK)
   getClientInfo(@Req() req: Request) {
-    console.log(req.ip);
     const ip =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket.remoteAddress ||
@@ -210,7 +209,6 @@ export class AuthController {
     const method = req.method;
     const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
     const location = this.getLocationFromIp(ip);
-    console.log(location);
     return {
       success: true,
       data: {

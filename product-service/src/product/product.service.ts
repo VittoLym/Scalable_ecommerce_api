@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { FilterProductDto } from './dto/filter-product.dto';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
+import { FilterProductDto } from '../dto/filter-product.dto';
+import { CreateProductDto } from '../dto/create-product.dto';
+import { UpdateProductDto } from '../dto/update-product.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ProductService {
+  constructor(private prisma: PrismaService) {}
   async findAll(filterDto: FilterProductDto) {
     const {
       search,
