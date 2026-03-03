@@ -367,6 +367,7 @@ export class AuthService {
   async resetPassword(
     token: string,
     newPassword: string,
+    metadata: { requestIp?: string; userAgent?: string; location?: string },
   ): Promise<{ success: boolean; message: string }> {
     try {
       this.logger.log('🔄 Procesando reset de contraseña');
@@ -454,9 +455,14 @@ export class AuthService {
         `✅ Contraseña restablecida exitosamente para usuario: ${user.id}`,
       );
       try {
-        await this.sendPasswordChangedEmail(
+        await this.emailService.sendPasswordChangedEmail(
           user.email,
-          user.profile?.firstName || 'unknow',
+          user.profile?.fullName || 'unknow',
+          {
+            ip: metadata.requestIp || 'local',
+            device: metadata.userAgent || 'userAgent',
+            location: metadata.location || 'Argentina',
+          },
         );
       } catch (mailError) {
         this.logger.error('Error enviando email de confirmación:', mailError);
@@ -477,22 +483,6 @@ export class AuthService {
       throw new InternalServerErrorException(
         'Error al procesar la solicitud. Por favor intenta nuevamente.',
       );
-    }
-  }
-  async sendPasswordChangedEmail(email: string, name?: string): Promise<void> {
-    try {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const loginLink = `${frontendUrl}/login`;
-
-      await this.emailService.changePassword(email, name);
-
-      this.logger.log(`✅ Email de confirmación enviado a: ${email}`);
-    } catch (error) {
-      this.logger.error(
-        `❌ Error enviando email de confirmación a ${email}:`,
-        error,
-      );
-      // No lanzamos error porque no es crítico
     }
   }
 }

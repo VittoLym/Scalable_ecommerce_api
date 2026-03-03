@@ -31,6 +31,19 @@ import { RolesGuard } from './guards/roles.guard';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  getLocationFromIp(ip: string): string {
+    if (ip === '::1' || ip === '127.0.0.1') {
+      return 'Entorno local';
+    }
+    if (
+      ip.startsWith('192.168.') ||
+      ip.startsWith('10.') ||
+      ip.startsWith('172.')
+    ) {
+      return 'Red local';
+    }
+    return 'Ubicación no disponible (servicio no implementado)';
+  }
   @Post('login')
   async login(
     @Body() data: LoginUserDto,
@@ -167,8 +180,19 @@ export class AuthController {
   async resetPassword(
     @Body('token') token: string,
     @Body('password') newPassword: string,
+    @Req() req,
   ) {
-    const user = await this.authService.resetPassword(token, newPassword);
+    const requestIp = 
+      req.headers['x-forwarded-for']?.toString().split(',')[0] || 
+      req.socket.remoteAddress ||
+      'IP no disponible';
+    const userAgent =
+      (req.headers['user-agent'] as string) || 'User-Agent no disponible';
+    const location = await this.getLocationFromIp(requestIp);
+    const user = await this.authService.resetPassword(token, newPassword, {
+      location,
+      userAgent,
+      requestIp });
     return user;
   }
 }

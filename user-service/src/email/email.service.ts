@@ -81,4 +81,46 @@ export class EmailService {
   async changePassword(email: string, name?: string) {
     console.log('hola');
   }
+  async sendPasswordChangedEmail(
+    email: string,
+    name?: string,
+    metadata?: {
+      ip?: string;
+      device?: string;
+      location?: string;
+    },
+  ): Promise<{ success: boolean }> {
+    try {
+      const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3001';
+      const loginLink = `${frontendUrl}/login`;
+      const supportEmail = this.configService.get('SUPPORT_EMAIL') || 'vitto.jsx@gmail.com';
+
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Tu contraseña ha sido cambiada - Notificación de seguridad',
+        template: './password-changed',
+        context: {
+          name: name || 'usuario',
+          loginLink,
+          frontendUrl,
+          year: new Date().getFullYear(),
+          supportEmail,
+          currentDateTime: new Date(),
+          device: metadata?.device,
+          ip: metadata?.ip,
+          location: metadata?.location,
+        },
+      });
+      this.logger.log(
+        `✅ Email de confirmación de cambio de contraseña enviado a: ${email}`,
+      );
+      return { success: true };
+    } catch (error) {
+      this.logger.error(
+        `❌ Error enviando email de cambio de contraseña a ${email}:`,
+        error,
+      );
+      return { success: false };
+    }
+  }
 }

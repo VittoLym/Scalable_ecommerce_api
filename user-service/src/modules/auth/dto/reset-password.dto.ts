@@ -16,7 +16,7 @@ export class ResetPasswordDto {
   })
   @IsString({ message: 'La contraseña debe ser un texto' })
   @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, { 
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
     message: 'La contraseña debe contener al menos una mayúscula, una minúscula y un número' 
   })
   @IsNotEmpty({ message: 'La contraseña es requerida' })
