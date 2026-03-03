@@ -3,6 +3,8 @@ import {
   UnauthorizedException,
   BadRequestException,
   Logger,
+  HttpException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -23,6 +25,7 @@ import { UserResponseDto } from '../user/dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { EmailService } from 'src/email/email.service';
 import { randomBytes } from 'crypto';
+import { profile } from 'console';
 
 @Injectable()
 export class AuthService {
@@ -335,6 +338,7 @@ export class AuthService {
   async sendPasswordResetEmail(email: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: { profile: true },
     });
 
     if (user) {
@@ -353,45 +357,142 @@ export class AuthService {
           passwordResetExpiresAt: new Date(Date.now() + 3600000), // 1 hora
         },
       });
-      const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-//      await this.mailerService.sendMail({
-//        to: user.email,
-//        subject: 'Restablecer tu contraseña',
-//        template: './forgot-password', // puedes crear un template
-//        context: {
-//          name: user.name || user.email,
-//          resetUrl,
-//        },
-//      });
+      await this.emailService.sendPasswordResetEmail(
+        email,
+        token,
+        user.profile?.fullName || 'unknow',
+      );
     }
   }
-  async resetPassword(token: string, newPassword: string) {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        passwordResetToken: token,
-        passwordResetExpiresAt: { gt: new Date() },
-      },
-    });
-
-    if (!user) {
-      throw new BadRequestException('Invalid or expired token');
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      this.logger.log('🔄 Procesando reset de contraseña');
+      let payload: any;
+      try {
+        payload = await this.jwtService.verifyAsync(token, {
+          secret: process.env.JWT_SECRET,
+        });
+      } catch (error) {
+        this.logger.error('❌ Token inválido o expirado:', error.message);
+        if (error.name === 'TokenExpiredError') {
+          throw new UnauthorizedException(
+            'El enlace de recuperación ha expirado. Solicita uno nuevo.',
+          );
+        }
+        throw new UnauthorizedException(
+          'El enlace de recuperación no es válido.',
+        );
+      }
+      if (payload.type !== 'password-reset') {
+        this.logger.error('❌ Tipo de token incorrecto:', payload.type);
+        throw new UnauthorizedException(
+          'El enlace de recuperación no es válido.',
+        );
+      }
+      const user = await this.prisma.user.findFirst({
+        where: {
+          id: payload.sub,
+          passwordResetToken: token,
+          passwordResetExpiresAt: {
+            gt: new Date(),
+          },
+        },
+        include: {
+          profile: true,
+        },
+      });
+      if (!user) {
+        this.logger.error('❌ Usuario no encontrado o token ya utilizado');
+        throw new UnauthorizedException(
+          'El enlace de recuperación ya fue utilizado o es inválido.',
+        );
+      }
+      if (!newPassword || newPassword.length < 8) {
+        throw new BadRequestException(
+          'La contraseña debe tener al menos 8 caracteres',
+        );
+      }
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+      if (!passwordRegex.test(newPassword)) {
+        throw new BadRequestException(
+          'La contraseña debe contener al menos una mayúscula, una minúscula y un número',
+        );
+      }
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            password: hashedPassword,
+            passwordResetToken: null,
+            passwordResetExpiresAt: null,
+          },
+        });
+        await tx.userSession.updateMany({
+          where: {
+            userId: user.id,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: new Date(),
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            userId: user.id,
+            action: 'PASSWORD_RESET_SUCCESS',
+            metadata: {
+              timestamp: new Date().toISOString(),
+            },
+          },
+        });
+      });
+      this.logger.log(
+        `✅ Contraseña restablecida exitosamente para usuario: ${user.id}`,
+      );
+      try {
+        await this.sendPasswordChangedEmail(
+          user.email,
+          user.profile?.firstName || 'unknow',
+        );
+      } catch (mailError) {
+        this.logger.error('Error enviando email de confirmación:', mailError);
+      }
+      return {
+        success: true,
+        message:
+          'Contraseña actualizada exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.',
+      };
+    } catch (error) {
+      this.logger.error(
+        `❌ Error en resetPassword: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error al procesar la solicitud. Por favor intenta nuevamente.',
+      );
     }
+  }
+  async sendPasswordChangedEmail(email: string, name?: string): Promise<void> {
+    try {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const loginLink = `${frontendUrl}/login`;
 
-    const hashed = await bcrypt.hash(newPassword, 10);
+      await this.emailService.changePassword(email, name);
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashed,
-        passwordResetToken: null,
-        passwordResetExpiresAt: null,
-      },
-    });
-    await this.prisma.userSession.updateMany({
-      where: { userId: user.id, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-
-    return { message: 'Password updated successfully' };
+      this.logger.log(`✅ Email de confirmación enviado a: ${email}`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Error enviando email de confirmación a ${email}:`,
+        error,
+      );
+      // No lanzamos error porque no es crítico
+    }
   }
 }

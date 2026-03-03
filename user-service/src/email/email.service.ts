@@ -78,4 +78,7 @@ export class EmailService {
       return { success: false };
     }
   }
+  async changePassword(email: string, name?: string) {
+    console.log('hola');
+  }
 }
