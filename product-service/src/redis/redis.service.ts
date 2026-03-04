@@ -26,7 +26,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       port: redisPort,
       retryStrategy: (times) => {
         const delay = Math.min(times * 50, 2000);
-        this.logger.log(redisHost,redisPort)
         this.logger.log(`⏳ Reintentando conexión en ${delay}ms (intento ${times})`);
         return delay;
       },

@@ -1,12 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, Logger } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import { FilterProductDto } from '../dto/filter-product.dto';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()
 export class ProductService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+  ) {}
+  private readonly logger = new Logger(ProductService.name);
   async findAll(filterDto: FilterProductDto) {
     const {
       search,
@@ -94,5 +99,18 @@ export class ProductService {
         isActive: false,
       },
     });
+  }
+  async checkDatabaseConnection(): Promise<boolean> {
+    if (!this.prisma) {
+      console.error('Prisma is undefined in checkDatabaseConnection');
+      throw new Error('Prisma service not initialized');
+    }
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return true;
+    } catch (error) {
+      console.log(error);
+      throw new Error('Database connection failed');
+    }
   }
 }

@@ -120,7 +120,6 @@ export class AuthController {
   @Roles(Role.ADMIN)
   @Post('admin')
   admin(@Req() req: Request) {
-    console.log(req.user);
     console.log('acá debería ir el dashboard.');
     return 'admin dashboard';
   }

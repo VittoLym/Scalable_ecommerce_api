@@ -2,8 +2,6 @@ import { Module } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserRepository } from './user.repository';
 import { UserController } from './user.controller';
-import { APP_GUARD } from '@nestjs/core';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RedisModule } from '../redis/redis.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
@@ -18,6 +16,7 @@ import { PassportModule } from '@nestjs/passport';
 
 @Module({
   imports: [
+    RedisModule,
     PassportModule,
     ConfigModule.forRoot({
       isGlobal: true,
@@ -29,18 +28,28 @@ import { PassportModule } from '@nestjs/passport';
     }),
     ClientsModule.register([
       {
-        name: 'ORDER_SERVICE',
+        name: 'PRODUCT_SERVICE', // Para comunicarse con product-service
         transport: Transport.RMQ,
         options: {
-          urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'order_service_queue',
+          urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
+          queue: 'product_service_queue',
+          queueOptions: {
+            durable: false,
+          },
+        },
+      },
+      {
+        name: 'USER_SERVICE',
+        transport: Transport.RMQ,
+        options: {
+          urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
+          queue: 'user_service_queue',
           queueOptions: {
             durable: false,
           },
         },
       },
     ]),
-    RedisModule,
     AuthModule,
     EmailModule,
   ],

@@ -21,7 +21,7 @@ import { RedisService } from '../redis/redis.service';
 export class UserController {
   constructor(
     private readonly userService: UserService,
-    @Inject('ORDER_SERVICE') private orderClient: ClientProxy, // Opcional: para comunicarse con order-service
+    @Inject('PRODUCT_SERVICE') private productClient: ClientProxy, // Opcional: para comunicarse con order-service
     private readonly redisService: RedisService,
   ) {}
   @Get()
@@ -43,31 +43,43 @@ export class UserController {
       await this.userService.checkDatabaseConnection();
       healthStatus.dependencies.database = 'connected';
     } catch (error) {
+      console.log(error, '.');
       healthStatus.dependencies.database = 'disconnected';
       healthStatus.status = 'degraded';
     }
     try {
-      if (this.orderClient) {
-        await this.orderClient.connect();
-        healthStatus.dependencies.rabbitmq = 'connected';
+      if (this.productClient) {
+        console.log('📤 Enviando ping a product-service...');
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('RabbitMQ timeout')), 3000),
+        );
+        const pingPromise = this.productClient
+          .send('ping', { from: 'user-service', timestamp: Date.now() })
+          .toPromise();
+        const result = await Promise.race([pingPromise, timeoutPromise]);
+        if (result && result.pong) {
+          console.log('✅ Ping exitoso a product-service');
+          healthStatus.dependencies.rabbitmq = 'connected';
+        } else {
+          healthStatus.dependencies.rabbitmq = 'error';
+          healthStatus.status = 'degraded';
+        }
+      } else {
+        healthStatus.dependencies.rabbitmq = 'not_configured';
       }
     } catch (error) {
+      console.error('❌ RabbitMQ error:', error.message);
       healthStatus.dependencies.rabbitmq = 'disconnected';
       healthStatus.status = 'degraded';
     }
     try {
-      const redis = (this.redisService as any).redis; // Acceder al cliente Redis internamente
-      if (redis) {
-        const pingResult = await redis.ping();
-        healthStatus.dependencies.redis =
-          pingResult === 'PONG' ? 'connected' : 'error';
-      } else {
-        healthStatus.dependencies.redis = 'not_available';
-      }
+      const pingResult = await this.redisService.ping();
+      healthStatus.dependencies.redis = pingResult ? 'connected' : 'error';
     } catch (error) {
       healthStatus.dependencies.redis = 'disconnected';
       healthStatus.status = 'degraded';
     }
+
     return healthStatus;
   }
   @Get('redis-test')
@@ -113,6 +125,16 @@ export class UserController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async softDelete(@Param('id') id: string): Promise<void> {
     await this.userService.softDelete(id);
+  }
+  @MessagePattern('ping')
+  handlePing(@Payload() data: any) {
+    console.log('📡 Ping recibido en product-service desde:', data?.from);
+    return {
+      pong: true,
+      timestamp: new Date().toISOString(),
+      service: 'product-service',
+      receivedFrom: data?.from || 'pikiblainder'
+    };
   }
   @MessagePattern('get_user_by_id')
   async handleGetUserById(@Payload() data: { userId: string }) {

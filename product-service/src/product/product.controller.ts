@@ -7,21 +7,98 @@ import {
   Delete,
   Query,
   Param,
+  HttpCode,
+  HttpStatus,
+  Inject,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { FilterProductDto } from '../dto/filter-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+import { ClientProxy } from '@nestjs/microservices';
+import { RedisService } from 'src/redis/redis.service';
 
 @Controller('products')
 export class ProductController {
-  constructor(private readonly service: ProductService) {}
+  constructor(
+    private readonly service: ProductService,
+    @Inject('USER_SERVICE') private userClient: ClientProxy,
+    private readonly redisService: RedisService,
+  ) {}
 
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  async healthCheck() {
+    const healthStatus = {
+      status: 'ok',
+      service: 'user-service',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      dependencies: {
+        database: 'unknown',
+        rabbitmq: 'unknown',
+        redis: 'unknown',
+      },
+    };
+    try {
+      await this.service.checkDatabaseConnection();
+      healthStatus.dependencies.database = 'connected';
+    } catch (error) {
+      console.log(error, '.');
+      healthStatus.dependencies.database = 'disconnected';
+      healthStatus.status = 'degraded';
+    }
+    try {
+      if (this.userClient) {
+        console.log('📤 Enviando ping a product-service...');
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('RabbitMQ timeout')), 3000),
+        );
+        const pingPromise = this.userClient
+          .send('ping', { from: 'user-service', timestamp: Date.now() })
+          .toPromise();
+        const result = await Promise.race([pingPromise, timeoutPromise]);
+        if (result && result.pong) {
+          console.log('✅ Ping exitoso a product-service');
+          healthStatus.dependencies.rabbitmq = 'connected';
+        } else {
+          healthStatus.dependencies.rabbitmq = 'error';
+          healthStatus.status = 'degraded';
+        }
+      } else {
+        healthStatus.dependencies.rabbitmq = 'not_configured';
+      }
+    } catch (error) {
+      console.error('❌ RabbitMQ error:', error.message);
+      healthStatus.dependencies.rabbitmq = 'disconnected';
+      healthStatus.status = 'degraded';
+    }
+    try {
+      const pingResult = await this.redisService.ping();
+      healthStatus.dependencies.redis = pingResult ? 'connected' : 'error';
+    } catch (error) {
+      healthStatus.dependencies.redis = 'disconnected';
+      healthStatus.status = 'degraded';
+    }
+
+    return healthStatus;
+  }
   @Post()
   create(@Body() dto: CreateProductDto) {
     return this.service.create(dto);
   }
-
+  @MessagePattern('ping')
+  handlePing(@Payload() data: any) {
+    console.log('📡 Ping recibido en product-service desde:', data?.from);
+    return {
+      pong: true,
+      timestamp: new Date().toISOString(),
+      service: 'product-service',
+      receivedFrom: data?.from || 'pikiblainder'
+    };
+  }
   @Get()
   findAll(@Query() filter: FilterProductDto) {
     return this.service.findAll(filter);

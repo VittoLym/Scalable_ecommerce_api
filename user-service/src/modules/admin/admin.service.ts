@@ -1,13 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class AdminService {
-  constructor(
-    private prisma: PrismaService,
-    private redisService: RedisService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
   async getUserSessions(userId: string) {
     return this.prisma.userSession.findMany({
       where: {

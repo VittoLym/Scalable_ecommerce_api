@@ -114,7 +114,6 @@ export class UserService {
 
     return { success: true };
   }
-
   private toSafeUser(user: any) {
     const { password, ...safeUser } = user
     return safeUser

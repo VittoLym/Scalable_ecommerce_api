@@ -1,7 +1,9 @@
 version: '3.8'
 
 services:
-  # Solo lo necesario para user-service
+  # -------------------------
+  # RABBITMQ - Message Broker
+  # -------------------------
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq-dev
@@ -11,9 +13,43 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_ERLANG_COOKIE: "secret-cookie-for-cluster"
+    volumes:
+    - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - user-network
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    user: "rabbitmq:rabbitmq"
 
+  # -------------------------
+  # REDIS - Cache / Blacklist
+  # -------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+    - redis_data:/data
+    - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server --appendonly yes --requirepass ""
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    user: "redis:redis"
+  # -------------------------
+  # USER SERVICE DATABASE
+  # -------------------------
   user-db:
     image: postgres:15
     container_name: user-db-dev
@@ -24,22 +60,107 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - user_data_dev:/var/lib/postgresql/data
+      - user_data:/var/lib/postgresql/data
     networks:
-      - user-network
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d userdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Opcional: Si también necesitas Redis
-  redis:
-    image: redis:7-alpine
-    container_name: redis-dev
+  # -------------------------
+  # USER SERVICE
+  # -------------------------
+  user-service:
+    build: ./user-service
+    container_name: user-service-dev
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "3001:3001"
+    env_file:
+      - ./user-service/.env
+    environment:
+      NODE_ENV: production
+      PGSSLMODE: require
+      PGCHANNELBINDING: require
+      # Services
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user-db:
+        condition: service_healthy
     networks:
-      - user-network
+      - ecommerce-network
+    volumes:
+      - ./user-service:/app
+      - /app/node_modules
+
+  # -------------------------
+  # PRODUCT SERVICE DATABASE
+  # -------------------------
+  product-db:
+    image: postgres:15
+    container_name: product-db-dev
+    environment:
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_password
+      POSTGRES_DB: productdb
+    ports:
+      - "5434:5432"
+    volumes:
+      - product_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_user -d productdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------
+  # PRODUCT SERVICE
+  # -------------------------
+  product-service:
+    build: ./product-service
+    container_name: product-service-dev
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: development
+      PGSSLMODE: require
+      PGCHANNELBINDING: require
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://rabbitmq:5672
+    env_file:
+      - ./product-service/.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      product-db:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./product-service:/app
+      - /app/node_modules
 
 networks:
-  user-network:
+  ecommerce-network:
     driver: bridge
 
 volumes:
-  user_data_dev:
+  user_data:
+  product_data:
+  rabbitmq_data:
+  redis_data:
