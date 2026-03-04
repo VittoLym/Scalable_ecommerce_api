@@ -1,13 +1,17 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaModule } from 'src/prisma/prisma.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { CategoryModule } from './category/product.category.module';
 
 @Module({
   imports: [
+    PrismaModule,
     RedisModule,
+    forwardRef(() => CategoryModule),
     ClientsModule.register([
       {
         name: 'PRODUCT_SERVICE',
@@ -35,5 +39,6 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
   ],
   controllers: [ProductController],
   providers: [ProductService, PrismaService],
+  exports: [ProductService],
 })
 export class ProductModule {}

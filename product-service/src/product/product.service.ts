@@ -5,12 +5,11 @@ import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from 'src/redis/redis.service';
+import { Product } from '@prisma/client';
 
 @Injectable()
 export class ProductService {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
   private readonly logger = new Logger(ProductService.name);
   async findAll(filterDto: FilterProductDto) {
     const {
@@ -112,5 +111,132 @@ export class ProductService {
       console.log(error);
       throw new Error('Database connection failed');
     }
+  }
+  // ============= MÉTODOS PARA CATEGORÍAS =============
+
+  async findByCategories(categoryIds: string[]): Promise<Product[]> {
+    return this.prisma.product.findMany({
+      where: {
+        categoryId: {
+          in: categoryIds,
+        },
+        isActive: true,
+      },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  }
+  async existsInCategory(categoryId: string): Promise<boolean> {
+    const count = await this.prisma.product.count({
+      where: {
+        categoryId: categoryId,
+        isActive: true,
+      },
+    });
+    return count > 0;
+  }
+  async countByCategory(categoryId: string): Promise<number> {
+    return this.prisma.product.count({
+      where: {
+        categoryId: categoryId,
+        isActive: true,
+      },
+    });
+  }
+  async getProductsByCategory(
+    categoryId: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    data: Product[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where: {
+          categoryId: categoryId,
+          isActive: true,
+        },
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: {
+          name: 'asc',
+        },
+      }),
+      this.prisma.product.count({
+        where: {
+          categoryId: categoryId,
+          isActive: true,
+        },
+      }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
+  }
+  async getCategoryProductStats(categoryId: string): Promise<any> {
+    const [totalProducts, activeProducts, totalValue, averagePrice] =
+      await Promise.all([
+        this.prisma.product.count({
+          where: {
+            categoryId: categoryId,
+          },
+        }),
+        this.prisma.product.count({
+          where: {
+            categoryId: categoryId,
+            isActive: true,
+          },
+        }),
+        this.prisma.product.aggregate({
+          where: {
+            categoryId: categoryId,
+          },
+          _sum: {
+            price: true,
+          },
+        }),
+        this.prisma.product.aggregate({
+          where: {
+            categoryId: categoryId,
+          },
+          _avg: {
+            price: true,
+          },
+        }),
+      ]);
+    return {
+      categoryId,
+      totalProducts,
+      activeProducts,
+      inactiveProducts: totalProducts - activeProducts,
+      totalValue: totalValue._sum.price || 0,
+      averagePrice: averagePrice._avg.price || 0,
+    };
   }
 }

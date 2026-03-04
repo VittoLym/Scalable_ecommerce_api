@@ -14,7 +14,32 @@ model Product {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  categoryId String
 
+  category Category[]
   @@index([name])
   @@index([price])
+}
+model Category {
+  id               String    @id @default(cuid())
+  name             String    @unique
+  description      String?
+  parentId         String?
+  isActive         Boolean   @default(true)
+  hasSubcategories Boolean   @default(false)
+  imageUrl         String?
+  displayOrder     Int       @default(0)
+  metadata         Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  // Relaciones
+  parent           Category?      @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children         Category[]     @relation("CategoryToCategory")
+  products         Product[]
+
+  @@index([parentId])
+  @@index([isActive])
+  @@index([name])
 }
