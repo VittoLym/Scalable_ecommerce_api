@@ -2,6 +2,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
+import { join } from 'path';
 
 @Injectable()
 export class EmailService {
@@ -15,6 +16,11 @@ export class EmailService {
   async sendVerificationEmail(email: string, token: string, name?: string) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const verificationLink = `${frontendUrl}/verify-email?token=${token}`;
+    const iwi =
+      process.env.NODE_ENV === 'production'
+        ? join(__dirname, 'templates')
+        : join(process.cwd(), 'src/email/templates');
+    console.log(iwi);
     try {
       await this.mailerService.sendMail({
         to: email,

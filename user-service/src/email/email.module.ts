@@ -4,7 +4,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { EmailService } from './email.service';
 import { ConfigService, ConfigModule } from '@nestjs/config';
-import * as path from 'path';
+import { join } from 'path';
 
 const configModule = ConfigModule.forRoot({
   isGlobal: true,
@@ -43,7 +43,10 @@ const configModule = ConfigModule.forRoot({
             from: configService.get('EMAIL_FROM'),
           },
           template: {
-            dir: `C:/Users/PC/Documents/Projects/Scalable_ecommerce_api/user-service/src/email/templates`,
+            dir:
+              process.env.NODE_ENV === 'production'
+                ? join(__dirname, 'templates') // En Docker: /app/dist/email/templates
+                : join(process.cwd(), 'src/email/templates'), // En local: ./src/email/templates
             adapter: new HandlebarsAdapter(),
             options: {
               strict: true,

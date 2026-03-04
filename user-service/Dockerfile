@@ -40,6 +40,8 @@ COPY --from=builder /app/node_modules ./node_modules
 
 # Copiar el build
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src/email/templates /app/dist/src/email/templates
+RUN ls -la /app/dist/src/email/templates/ || echo "⚠️ No se encontraron plantillas"
 
 # Copiar prisma (para migraciones)
 COPY --from=builder /app/prisma ./prisma
