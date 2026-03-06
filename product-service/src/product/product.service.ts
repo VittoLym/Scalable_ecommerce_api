@@ -64,8 +64,6 @@ export class ProductService {
     };
   }
   async create(dto: CreateProductDto) {
-    console.log('DTO después de validación:', dto);
-    console.log('Propiedades del DTO:', Object.keys(dto));
     try {
       const productData = {
         name: dto.name,

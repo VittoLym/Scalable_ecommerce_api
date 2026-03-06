@@ -42,6 +42,7 @@ export class CategoryService {
         );
       }
       if (parentId) {
+        console.log(parentId);
         const parentExists = await this.prisma.category.findUnique({
           where: { id: parentId },
         });

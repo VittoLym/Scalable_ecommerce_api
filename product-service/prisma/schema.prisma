@@ -16,12 +16,12 @@ model Product {
   updatedAt   DateTime @updatedAt
   categoryId String
 
-  category Category[]
+  category    Category? @relation(fields: [categoryId], references: [id])
   @@index([name])
   @@index([price])
 }
 model Category {
-  id               String    @id @default(cuid())
+  id               String    @id @default(uuid())
   name             String    @unique
   description      String?
   parentId         String?

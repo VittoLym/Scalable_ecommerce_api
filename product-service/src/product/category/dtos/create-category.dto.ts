@@ -47,10 +47,8 @@ export class CreateCategoryDto {
   @Type(() => Number)
   displayOrder?: number;
 
-  @IsObject({ message: 'Los metadatos deben ser un objeto válido' })
   @IsOptional()
-  @ValidateNested()
-  @Type(() => Object)
+  @IsObject({ message: 'Los metadatos deben ser un objeto válido' })
   metadata?: Record<string, any>;
 
   @IsOptional()
