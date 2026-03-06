@@ -27,7 +27,7 @@ export class ProductController {
     private readonly redisService: RedisService,
   ) {}
 
-  @Get()
+  @Get('health')
   @HttpCode(HttpStatus.OK)
   async healthCheck() {
     const healthStatus = {
