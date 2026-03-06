@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ProductModule } from './product/product.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(ProductModule);
@@ -14,8 +15,18 @@ async function bootstrap() {
       },
     },
   });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  );
 
   await app.startAllMicroservices();
-  await app.listen(process.env.PORT ?? 3002);
+  await app.listen(process.env.PORT ?? 3005);
 }
 bootstrap();

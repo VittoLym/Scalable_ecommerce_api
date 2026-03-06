@@ -64,12 +64,37 @@ export class ProductService {
     };
   }
   async create(dto: CreateProductDto) {
-    const productData = await this.prisma.product.create({
-      data: dto,
-    });
-    if (productData != undefined) return { error: 'error creating product' };
-
-    return productData;
+    console.log('DTO después de validación:', dto);
+    console.log('Propiedades del DTO:', Object.keys(dto));
+    try {
+      const productData = {
+        name: dto.name,
+        description: dto.description,
+        price: dto.price,
+        stock: dto.stock,
+        isActive: dto.isActive ?? true,
+        categoryId: dto.categoryId,
+      };
+      console.log('Datos a insertar:', productData);
+      const product = await this.prisma.product.create({
+        data: productData,
+        include: {
+          category: true,
+        },
+      });
+      return {
+        success: true,
+        message: 'Product created successfully',
+        data: product,
+      };
+    } catch (error) {
+      console.error('Error creating product:', error);
+      return {
+        success: false,
+        error: 'Error creating product',
+        details: error.message
+      };
+    }
   }
   async findById(id: string) {
     const product = await this.prisma.product.findUnique({
