@@ -73,7 +73,6 @@ export class ProductService {
         isActive: dto.isActive ?? true,
         categoryId: dto.categoryId,
       };
-      console.log('Datos a insertar:', productData);
       const product = await this.prisma.product.create({
         data: productData,
         include: {
