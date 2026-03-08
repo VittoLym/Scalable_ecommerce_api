@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  UseGuards,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from '../dto/create-product.dto';
@@ -18,6 +19,7 @@ import { UpdateProductDto } from '../dto/update-product.dto';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { ClientProxy } from '@nestjs/microservices';
 import { RedisService } from 'src/redis/redis.service';
+import { AdminGuard } from '../auth/guards/admin.guard';
 
 @Controller('products')
 export class ProductController {
@@ -86,6 +88,7 @@ export class ProductController {
     return healthStatus;
   }
   @Post()
+  @UseGuards(AdminGuard)
   create(@Body() dto: CreateProductDto) {
     return this.service.create(dto);
   }

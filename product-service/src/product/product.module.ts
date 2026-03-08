@@ -6,9 +6,11 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { CategoryModule } from './category/product.category.module';
+import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
   imports: [
+    AuthModule,
     PrismaModule,
     RedisModule,
     forwardRef(() => CategoryModule),

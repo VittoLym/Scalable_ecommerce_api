@@ -26,10 +26,17 @@ import { AuthGuard } from '@nestjs/passport';
 import { ForgotPasswordDto } from './dto/forgot-password';
 import { UserResponseDto } from '../user/dto/user-response.dto';
 import { RolesGuard } from './guards/roles.guard';
+import { JwtService } from '@nestjs/jwt';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+import { UserService } from '../user/user.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private jwtService: JwtService,
+    private userService: UserService,
+  ) {}
 
   getLocationFromIp(ip: string): string {
     if (ip === '::1' || ip === '127.0.0.1') {
@@ -220,5 +227,23 @@ export class AuthController {
         location,
       },
     };
+  }
+  @MessagePattern('validate_token')
+  async validateToken(@Payload() data: { token: string }) {
+    try {
+      const decoded = this.jwtService.verify(data.token);
+      const user = await this.userService.findById(decoded.sub);
+      return {
+        valid: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          roles: user.roles || [user.role],
+        },
+      };
+    } catch (error) {
+      return { valid: false, error: error.message };
+    }
   }
 }
