@@ -291,6 +291,7 @@ export class AuthService {
         emailVerified: true,
         verificationToken: null,
         verificationExpiresAt: null,
+        status: 'ACTIVE',
       },
     });
 

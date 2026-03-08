@@ -13,18 +13,21 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  UseGuards
 } from '@nestjs/common';
 import { CategoryService } from './product.category.service';
 import { CreateCategoryDto } from './dtos/create-category.dto';
 import { FilterCategoryDto } from './dtos/filter-category.dto';
 import { UpdateCategoryDto } from './dtos/update-category.dto';
 import { BulkOperationDto } from 'src/dto/bulk-operation.dto';
+import { AdminGuard } from '../../auth/guards/admin.guard';
 
 @Controller('products/category')
 export class CategoryController {
   private readonly logger = new Logger(CategoryController.name);
   constructor(private readonly categoryService: CategoryService) {}
 
+  @UseGuards(AdminGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() dto: CreateCategoryDto) {
@@ -109,6 +112,7 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Get('tree/all')
   @HttpCode(HttpStatus.OK)
   async getTree() {
@@ -130,6 +134,7 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Get(':id/breadcrumb')
   @HttpCode(HttpStatus.OK)
   async getBreadcrumb(@Param('id', new ParseUUIDPipe()) id: string) {
@@ -172,6 +177,7 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Get('stats/summary')
   @HttpCode(HttpStatus.OK)
   async getStats() {
@@ -193,6 +199,7 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
@@ -217,6 +224,7 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id', new ParseUUIDPipe()) id: string) {
@@ -237,6 +245,7 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Delete('bulk/remove')
   @HttpCode(HttpStatus.OK)
   async bulkRemove(@Body() bulkOperationDto: BulkOperationDto) {
@@ -272,6 +281,7 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Patch('bulk/status')
   @HttpCode(HttpStatus.OK)
   async bulkUpdateStatus(@Body() bulkOperationDto: BulkOperationDto) {
@@ -325,6 +335,7 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Get('health/status')
   @HttpCode(HttpStatus.OK)
   async healthCheck() {

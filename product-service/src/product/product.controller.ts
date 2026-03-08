@@ -29,6 +29,7 @@ export class ProductController {
     private readonly redisService: RedisService,
   ) {}
 
+  @UseGuards(AdminGuard)
   @Get('health')
   @HttpCode(HttpStatus.OK)
   async healthCheck() {
@@ -92,6 +93,7 @@ export class ProductController {
   create(@Body() dto: CreateProductDto) {
     return this.service.create(dto);
   }
+  @UseGuards(AdminGuard)
   @MessagePattern('ping')
   handlePing(@Payload() data: any) {
     console.log('📡 Ping recibido en product-service desde:', data?.from);
@@ -112,11 +114,13 @@ export class ProductController {
     return this.service.findById(id);
   }
 
+  @UseGuards(AdminGuard)
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     return this.service.update(id, dto);
   }
 
+  @UseGuards(AdminGuard)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
