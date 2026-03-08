@@ -179,25 +179,99 @@ export class CategoryService {
   }
   async getProducts(id: string): Promise<any> {
     const category = await this.findById(id);
-    let categoryIds = [id];
-    if (category.hasSubcategories) {
-      const subcategories = await this.prisma.category.findMany({
-        where: {
-          parentId: id,
-          isActive: true,
-          deletedAt: null,
+    const result = await this.getAllSubcategoriesWithDepth(id);
+    console.log(`\n📊 JERARQUÍA COMPLETA:`);
+    console.log(`Categoría raíz: ${category.name}`);
+    this.printCategoryHierarchy(
+      [
+        {
+          id,
+          name: category.name,
+          children: result.hierarchy,
         },
-        select: { id: true },
-      });
-      categoryIds = [...categoryIds, ...subcategories.map((sub) => sub.id)];
-    }
+      ],
+      0,
+    );
+    console.log(`\n📌 Estadísticas:`);
+    console.log(`   - Total subcategorías: ${result.allIds.size}`);
+    console.log(`   - Profundidad máxima: ${result.maxDepth}`);
+    console.log(`   - Categorías a buscar: ${result.allIds.size + 1}`);
+    const categoryIds = [id, ...result.allIds];
     const products = await this.productService.findByCategories(categoryIds);
     return {
       category: category.name,
       products,
       totalProducts: products.length,
       includesSubcategories: category.hasSubcategories,
+      stats: {
+        totalCategories: categoryIds.length,
+        totalSubcategories: result.allIds.size,
+        maxDepth: result.maxDepth,
+      },
     };
+  }
+  private async getAllSubcategoriesWithDepth(
+    parentId: string,
+    currentDepth: number = 1,
+    visitedIds: Set<string> = new Set(),
+  ): Promise<{
+    allIds: Set<string>;
+    hierarchy: any[];
+    maxDepth: number;
+  }> {
+    if (visitedIds.has(parentId)) {
+      console.warn(`⚠️ Ciclo detectado: categoría ${parentId} ya fue visitada`);
+      return { allIds: new Set(), hierarchy: [], maxDepth: currentDepth };
+    }
+    visitedIds.add(parentId);
+    const subcategories = await this.prisma.category.findMany({
+      where: {
+        parentId: parentId,
+        isActive: true,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        hasSubcategories: true,
+      },
+    });
+
+    const allIds = new Set<string>();
+    const hierarchy: any[] = [];
+    let maxDepth = currentDepth;
+
+    for (const sub of subcategories) {
+      allIds.add(sub.id);
+      const subNode: any = {
+        id: sub.id,
+        name: sub.name,
+        depth: currentDepth,
+        children: [],
+      };
+
+      if (sub.hasSubcategories) {
+        const deeper = await this.getAllSubcategoriesWithDepth(
+          sub.id,
+          currentDepth + 1,
+          visitedIds,
+        );
+        subNode.children = deeper.hierarchy;
+        deeper.allIds.forEach((id) => allIds.add(id));
+        maxDepth = Math.max(maxDepth, deeper.maxDepth);
+      }
+      hierarchy.push(subNode);
+    }
+    return { allIds, hierarchy, maxDepth };
+  }
+  private printCategoryHierarchy(categories: any[], level: number): void {
+    const indent = '  '.repeat(level);
+    for (const cat of categories) {
+      console.log(`${indent}📂 ${cat.name} (${cat.id})`);
+      if (cat.children && cat.children.length > 0) {
+        this.printCategoryHierarchy(cat.children, level + 1);
+      }
+    }
   }
   async update(
     id: string,

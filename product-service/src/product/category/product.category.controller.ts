@@ -20,7 +20,7 @@ import { FilterCategoryDto } from './dtos/filter-category.dto';
 import { UpdateCategoryDto } from './dtos/update-category.dto';
 import { BulkOperationDto } from 'src/dto/bulk-operation.dto';
 
-@Controller('product/category')
+@Controller('products/category')
 export class CategoryController {
   private readonly logger = new Logger(CategoryController.name);
   constructor(private readonly categoryService: CategoryService) {}
