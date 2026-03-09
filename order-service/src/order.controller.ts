@@ -8,13 +8,12 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { OrdersService } from './app.service';
+import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus } from '@prisma/client';
-
 @Controller('orders')
-export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+export class OrderController {
+  constructor(private readonly ordersService: OrderService) {}
 
   @Post()
   @UsePipes(new ValidationPipe({ transform: true }))

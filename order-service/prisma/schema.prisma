@@ -6,60 +6,122 @@ datasource db {
   provider = "postgresql"
 }
 
-model Product {
-  id          String   @id
-  name        String
-  description String?
-  price       Float
-  stock       Int
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-
-  @@index([name])
-  @@index([price])
+// Enums para estados, aseguran consistencia y son ideales para valores fijos [citation:3][citation:8].
+enum OrderStatus {
+  PENDING        // Pendiente de pago o procesamiento
+  PROCESSING     // Pago confirmado, preparando envío
+  SHIPPED        // Enviado
+  DELIVERED      // Entregado
+  CANCELLED      // Cancelado por el usuario o el sistema
+  REFUNDED       // Reembolsado
 }
 
-model Order {
-  id            String        @id @default(cuid())
-  userId        String        @map("user_id")
-  status        OrderStatus   @default(PENDING)
-  totalAmount   Float         @map("total_amount")
-  paymentMethod String?       @map("payment_method")
-  paymentId     String?       @map("payment_id")
-  notes         String?
-  items         OrderItem[]
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-  completedAt   DateTime?     @map("completed_at")
-  cancelledAt   DateTime?     @map("cancelled_at")
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
 
+enum FulfillmentStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+}
+
+// --- MODELOS PRINCIPALES ---
+
+model Order {
+  id                String          @id @default(uuid())
+  orderNumber       String          @unique // Número legible para el cliente, puede tener un formato específico
+  userId            String // ID del usuario en user-service
+  userEmail         String? // Desnormalización útil para consultas rápidas sin llamar a user-service
+  status            OrderStatus     @default(PENDING)
+  totalAmount       Decimal         @db.Decimal(10, 2) // Usar Decimal para dinero [citation:1][citation:8]
+  subtotal          Decimal         @db.Decimal(10, 2)
+  taxAmount         Decimal         @db.Decimal(10, 2) @default(0)
+  shippingAmount    Decimal         @db.Decimal(10, 2) @default(0)
+  discountAmount    Decimal         @db.Decimal(10, 2) @default(0)
+  shippingAddress   Json            // Objeto con dirección completa: street, city, zipCode, country, etc.
+  billingAddress    Json?           // Objeto con dirección de facturación (puede ser null si es la misma)
+  contactEmail      String?
+  contactPhone      String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  items             OrderItem[]
+  payments          Payment[]
+  fulfillments      Fulfillment[]
+  statusHistory     OrderStatusHistory[]
   @@index([userId])
   @@index([status])
+  @@index([createdAt])
   @@map("orders")
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
-  orderId   String   @map("order_id")
-  productId String   @map("product_id")
-  quantity  Int
-  price     Float    // Precio en el momento de la compra
-  subtotal  Float    // quantity * price
-  
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@unique([orderId, productId])
+  id                String          @id @default(uuid())
+  orderId           String
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // IDs de otros servicios
+  productId         String          // ID del producto en product-service
+  productSnapshot   Json            // ¡IMPORTANTE! Instantánea del producto en el momento de la compra: nombre, descripción, imagen (para referencia histórica)
+  quantity          Int
+  unitPrice         Decimal         @db.Decimal(10, 2) // Precio de un solo artículo en el momento de la compra
+  totalPrice        Decimal         @db.Decimal(10, 2) // quantity * unitPrice
+  @@unique([orderId, productId]) // Un producto aparece una sola vez por orden [citation:1]
   @@index([productId])
   @@map("order_items")
 }
 
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  PROCESSING
-  SHIPPED
-  DELIVERED
-  CANCELLED
-  REJECTED
+model Payment {
+  id                String          @id @default(uuid())
+  orderId           String
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod     String          // 'CREDIT_CARD', 'PAYPAL', 'BANK_TRANSFER'
+  status            PaymentStatus   @default(PENDING)
+  amount            Decimal         @db.Decimal(10, 2)
+  currency          String          @default("USD")
+  transactionId     String?         // ID de la pasarela de pago (Stripe, PayPal, etc.)
+  providerResponse  Json?           // Respuesta completa del proveedor para auditoría [citation:7]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  @@index([status])
+  @@index([transactionId])
+  @@map("payments")
+}
+
+model Fulfillment {
+  id                String          @id @default(uuid())
+  orderId           String
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status            FulfillmentStatus @default(PENDING)
+  carrier           String?         // 'DHL', 'FEDEX', 'CORREOS'
+  trackingNumber    String?
+  trackingUrl       String?
+  shippedAt         DateTime?
+  deliveredAt       DateTime?
+  items             FulfillmentItem[]
+  @@map("fulfillments")
+}
+
+model FulfillmentItem {
+  fulfillmentId     String
+  fulfillment       Fulfillment     @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+  orderItemId       String
+  orderItem         OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  quantity          Int             // Cantidad de este producto en este envío
+  @@id([fulfillmentId, orderItemId])
+  @@map("fulfillment_items")
+}
+
+model OrderStatusHistory {
+  id                String          @id @default(uuid())
+  orderId           String
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status            OrderStatus     // El nuevo estado
+  reason            String?         // Opcional: "Pago rechazado", "Solicitud del cliente", etc.
+  createdAt         DateTime        @default(now())
+  @@index([orderId])
+  @@map("order_status_histories")
 }

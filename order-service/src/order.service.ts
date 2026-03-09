@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { EventsService } from './events/events.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -6,8 +10,8 @@ import { OrderStatus } from '@prisma/client';
 import { Logger } from '@nestjs/common';
 
 @Injectable()
-export class OrdersService {
-  private readonly logger = new Logger(OrdersService.name);
+export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
 
   constructor(
     private prisma: PrismaService,
