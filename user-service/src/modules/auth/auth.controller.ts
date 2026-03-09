@@ -29,8 +29,10 @@ import { RolesGuard } from './guards/roles.guard';
 import { JwtService } from '@nestjs/jwt';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { UserService } from '../user/user.service';
+import { SkipRolesGuard } from './dto/skip-roles.decorator';
 
 @Controller('auth')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AuthController {
   constructor(
     private authService: AuthService,
@@ -38,7 +40,7 @@ export class AuthController {
     private userService: UserService,
   ) {}
 
-  getLocationFromIp(ip: string): string {
+  private getLocationFromIp(ip: string): string {
     if (ip === '::1' || ip === '127.0.0.1') {
       return 'Entorno local';
     }
@@ -52,6 +54,7 @@ export class AuthController {
     return 'Ubicación no disponible (servicio no implementado)';
   }
   @Post('login')
+  @SkipRolesGuard()
   async login(
     @Body() data: LoginUserDto,
     @Ip() ip?: string,
@@ -88,6 +91,7 @@ export class AuthController {
   }
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @SkipRolesGuard()
   async register(
     @Body() registerDto: RegisterDto,
     @Req() req: Request,
@@ -123,7 +127,6 @@ export class AuthController {
       data: user,
     };
   }
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Post('admin')
   admin(@Req() req: Request) {

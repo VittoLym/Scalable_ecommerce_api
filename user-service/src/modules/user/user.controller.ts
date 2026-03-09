@@ -3,29 +3,42 @@ import {
   Get,
   Post,
   Body,
+  Ip,
   Param,
   Delete,
   HttpCode,
   HttpStatus,
+  Headers,
   Req,
   Inject,
+  UseGuards,
 } from '@nestjs/common';
 import { ClientProxy, MessagePattern, Payload } from '@nestjs/microservices';
 import { UserService } from './user.service';
 import { RegisterUserDto } from './dto/user-register.dto';
 import { UserResponseDto } from './dto/user-response.dto';
+import { LoginUserDto } from '../auth/dto/login.dto';
 import type { Request } from 'express';
 import { RedisService } from '../redis/redis.service';
+import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Role } from '@prisma/client';
+import { SkipRolesGuard } from '../auth/dto/skip-roles.decorator';
+import { AuthService } from '../auth/auth.service';
 
 @Controller('users')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 export class UserController {
   constructor(
     private readonly userService: UserService,
     @Inject('PRODUCT_SERVICE') private productClient: ClientProxy, // Opcional: para comunicarse con order-service
     private readonly redisService: RedisService,
+    private readonly authService: AuthService,
   ) {}
   @Get()
   @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMIN)
   async healthCheck() {
     const healthStatus = {
       status: 'ok',
@@ -83,6 +96,7 @@ export class UserController {
     return healthStatus;
   }
   @Get('redis-test')
+  @Roles(Role.ADMIN)
   async testRedis() {
     try {
       const testJti = 'test-token-123';
@@ -104,25 +118,40 @@ export class UserController {
   }
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @SkipRolesGuard()
   async register(
     @Body() registerUserDto: RegisterUserDto,
     @Req() req: Request,
-  ): Promise<UserResponseDto> {
-    const ip = req.ip;
+  ) {
+    const ip = req.ip || 'local';
     const userAgent = req.headers['user-agent'];
-    const user = await this.userService.register(
-      registerUserDto,
-      ip,
-      userAgent,
-    );
-    return user;
+
+    const reg = await this.authService.create(registerUserDto, ip, userAgent);
+    return reg;
+  }
+  @Post('login')
+  @HttpCode(HttpStatus.CREATED)
+  @SkipRolesGuard()
+  async login(
+    @Body() data: LoginUserDto,
+    @Ip() ip?: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    try {
+      const reg = await this.authService.login(data, ip, userAgent);
+      return reg;
+    } catch (e) {
+      console.log(e);
+    }
   }
   @Get(':id')
+  @Roles(Role.ADMIN)
   async findById(@Param('id') id: string): Promise<any> {
     return this.userService.findById(id);
   }
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles(Role.ADMIN)
   async softDelete(@Param('id') id: string): Promise<void> {
     await this.userService.softDelete(id);
   }
@@ -151,10 +180,6 @@ export class UserController {
       };
     }
   }
-
-  /**
-   * Handler para validar múltiples usuarios (útil para order-service)
-   */
   @MessagePattern('validate_users')
   async handleValidateUsers(@Payload() data: { userIds: string[] }) {
     try {
@@ -187,10 +212,6 @@ export class UserController {
       };
     }
   }
-
-  /**
-   * Handler para obtener perfil básico de usuario (información limitada)
-   */
   @MessagePattern('get_user_profile')
   async handleGetUserProfile(@Payload() data: { userId: string }) {
     try {
@@ -212,10 +233,6 @@ export class UserController {
       };
     }
   }
-
-  /**
-   * Handler para verificar si un usuario existe
-   */
   @MessagePattern('user_exists')
   async handleUserExists(@Payload() data: { userId: string }) {
     try {
@@ -237,10 +254,6 @@ export class UserController {
       };
     }
   }
-
-  /**
-   * Handler para actualizar último inicio de sesión
-   */
   @MessagePattern('user_updated_login')
   async handleUserLogin(@Payload() data: { userId: string; ip?: string }) {
     try {
