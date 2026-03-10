@@ -17,22 +17,20 @@ import {
 import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginUserDto } from '../auth/dto/login.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AuthGuard as AG } from './guards/auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { RegisterDto } from './dto/register.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
-import { AuthGuard } from '@nestjs/passport';
 import { ForgotPasswordDto } from './dto/forgot-password';
 import { UserResponseDto } from '../user/dto/user-response.dto';
-import { RolesGuard } from './guards/roles.guard';
 import { JwtService } from '@nestjs/jwt';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { UserService } from '../user/user.service';
-import { SkipRolesGuard } from './dto/skip-roles.decorator';
+import { Public } from './dto/skip-roles.decorator';
 
 @Controller('auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(AG)
 export class AuthController {
   constructor(
     private authService: AuthService,
@@ -54,7 +52,7 @@ export class AuthController {
     return 'Ubicación no disponible (servicio no implementado)';
   }
   @Post('login')
-  @SkipRolesGuard()
+  @Public()
   async login(
     @Body() data: LoginUserDto,
     @Ip() ip?: string,
@@ -77,7 +75,7 @@ export class AuthController {
         });
       }
 
-      if (error instanceof UnauthorizedException) {
+      if (error!.message == 'Credenciales inválidas') {
         throw new HttpException(
           error.message || 'Credenciales inválidas',
           HttpStatus.UNAUTHORIZED,
@@ -91,7 +89,7 @@ export class AuthController {
   }
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @SkipRolesGuard()
+  @Public()
   async register(
     @Body() registerDto: RegisterDto,
     @Req() req: Request,
@@ -115,12 +113,12 @@ export class AuthController {
     }
   }
   @Get('verify-email')
+  @Public()
   async verifyEmail(@Query('token') token: string) {
     const user = await this.authService.verifyEmail(token);
     return user;
   }
   @Get('me')
-  @UseGuards(AuthGuard('jwt'))
   getProfile(@CurrentUser() user: any) {
     return {
       success: true,
@@ -133,7 +131,6 @@ export class AuthController {
     console.log('acá debería ir el dashboard.');
     return 'admin dashboard';
   }
-  @UseGuards(JwtAuthGuard)
   @Post('refresh')
   async refresh(
     @Req() req: Request,
@@ -152,7 +149,6 @@ export class AuthController {
     });
     return { accessToken };
   }
-  @UseGuards(JwtAuthGuard)
   @Post('logout')
   logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies['refreshToken'] as string;
@@ -166,7 +162,6 @@ export class AuthController {
 
     return this.authService.logout(refreshToken);
   }
-  @UseGuards(JwtAuthGuard)
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     try {
@@ -184,7 +179,6 @@ export class AuthController {
       };
     }
   }
-  @UseGuards(JwtAuthGuard)
   @Post('reset-password')
   async resetPassword(
     @Body('token') token: string,

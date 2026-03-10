@@ -8,6 +8,8 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { ConfigService, ConfigModule } from '@nestjs/config';
 import { UserModule } from '../user/user.module';
+import { AuthGuard as AG } from './guards/auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
@@ -24,7 +26,7 @@ import { UserModule } from '../user/user.module';
     EmailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, PrismaService, JwtStrategy],
+  providers: [AG, AuthService, PrismaService, JwtStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}

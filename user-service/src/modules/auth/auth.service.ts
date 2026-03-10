@@ -25,7 +25,6 @@ import { UserResponseDto } from '../user/dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { EmailService } from 'src/email/email.service';
 import { randomBytes } from 'crypto';
-import { profile } from 'console';
 
 @Injectable()
 export class AuthService {

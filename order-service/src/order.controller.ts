@@ -19,8 +19,6 @@ import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus } from '@prisma/client';
-import { AuthGuard } from '../guards/auth.guard';
-import { RolesGuard } from '../guards/role.guard';
 import { Roles } from '../decorator/role.decorator';
 import { User } from '../decorator/user.decorator';
 
@@ -29,7 +27,6 @@ export class OrderController {
   private readonly logger = new Logger(OrderController.name);
   constructor(private readonly orderService: OrderService) {}
   @Post()
-  @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createOrderDto: CreateOrderDto, @User() user: any) {
     this.logger.log(`📝 Creando orden para usuario: ${user.id}`);
@@ -43,7 +40,6 @@ export class OrderController {
     };
   }
   @Get()
-  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async findAll(
@@ -60,7 +56,6 @@ export class OrderController {
     };
   }
   @Get('stats')
-  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async getStats() {
@@ -73,7 +68,6 @@ export class OrderController {
     };
   }
   @Get('number/:orderNumber')
-  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async findByOrderNumber(@Param('orderNumber') orderNumber: string) {
@@ -86,7 +80,6 @@ export class OrderController {
     };
   }
   @Get('my-orders')
-  @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.OK)
   async findMyOrders(@User() user: any, @Query('status') status?: OrderStatus) {
     this.logger.log(`👤 Obteniendo órdenes del usuario: ${user.id}`);
@@ -98,7 +91,6 @@ export class OrderController {
     };
   }
   @Get('user/:userId')
-  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async findByUser(
@@ -114,7 +106,6 @@ export class OrderController {
     };
   }
   @Get(':id')
-  @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id', ParseUUIDPipe) id: string, @User() user: any) {
     this.logger.log(`🔍 Buscando orden: ${id}`);
@@ -161,7 +152,6 @@ export class OrderController {
     };
   }
   @Patch(':id/cancel')
-  @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.OK)
   async cancelOrder(
     @Param('id', ParseUUIDPipe) id: string,
@@ -194,7 +184,6 @@ export class OrderController {
     };
   }
   @Patch(':id/reject')
-  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async rejectOrder(
@@ -210,7 +199,6 @@ export class OrderController {
     };
   }
   @Post(':id/refund')
-  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async refundOrder(
@@ -226,7 +214,6 @@ export class OrderController {
     };
   }
   @Patch(':id/status')
-  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async updateStatus(

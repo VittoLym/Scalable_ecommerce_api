@@ -24,7 +24,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '@prisma/client';
-import { SkipRolesGuard } from '../auth/dto/skip-roles.decorator';
+import { Public } from '../auth/dto/skip-roles.decorator';
 import { AuthService } from '../auth/auth.service';
 
 @Controller('users')
@@ -118,7 +118,7 @@ export class UserController {
   }
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @SkipRolesGuard()
+  @Public()
   async register(
     @Body() registerUserDto: RegisterUserDto,
     @Req() req: Request,
@@ -131,7 +131,7 @@ export class UserController {
   }
   @Post('login')
   @HttpCode(HttpStatus.CREATED)
-  @SkipRolesGuard()
+  @Public()
   async login(
     @Body() data: LoginUserDto,
     @Ip() ip?: string,

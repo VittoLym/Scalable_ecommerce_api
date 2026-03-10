@@ -4,6 +4,7 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AllExceptionsFilter } from '../src/common/filters/http-expetions.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response-interceptos';
 import cookieParser from 'cookie-parser';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(UserModule);
@@ -25,6 +26,6 @@ async function bootstrap() {
   app.enableCors();
   await app.startAllMicroservices();
   await app.listen(process.env.PORT ?? 3001);
-  console.log(`User service running on port ${process.env.PORT}`);
+  Logger.log(`User service running on port ${process.env.PORT}`);
 }
 bootstrap();

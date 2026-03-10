@@ -7,7 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { Role } from '@prisma/client';
-import { SKIP_ROLES_KEY } from '../dto/skip-roles.decorator';
+import { Public } from '../dto/skip-roles.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -15,10 +15,10 @@ export class RolesGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     console.log('RolesGuard ejecutándose');
-    const skipRoles = this.reflector.getAllAndOverride<boolean>(
-      SKIP_ROLES_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const skipRoles = this.reflector.getAllAndOverride<boolean>(Public, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (skipRoles) {
       console.log('RolesGuard omitido para esta ruta');
       return true;

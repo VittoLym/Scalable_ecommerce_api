@@ -44,7 +44,7 @@ COPY --from=builder /app/dist ./dist
 # Copiar prisma (para migraciones)
 COPY --from=builder /app/prisma ./prisma
 
-EXPOSE 3001
+EXPOSE 3003
 
 # Comando para producción
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]

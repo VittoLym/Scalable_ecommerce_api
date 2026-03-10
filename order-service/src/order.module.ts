@@ -5,9 +5,11 @@ import { EventsModule } from './events/events.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { OrderService } from './order.service';
 import { OrderController } from './order.controller';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
+    HttpModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),
