@@ -87,6 +87,7 @@ export class OrderController {
     };
   }
   @Get('user/:userId')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async findByUser(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -211,13 +212,16 @@ export class OrderController {
   async updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateStatusDto: UpdateOrderStatusDto,
+    @User() user: any,
   ) {
     this.logger.log(
       `🔄 Actualizando estado de orden: ${id} a ${updateStatusDto.status}`,
     );
+    const dat = await this.orderService.updateStatus(id, updateStatusDto, user);
     return {
       success: true,
       message: 'Estado actualizado exitosamente',
+      data: dat,
     };
   }
   @Get('health/check')

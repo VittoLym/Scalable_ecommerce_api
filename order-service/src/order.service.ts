@@ -6,12 +6,14 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { EventsService } from './events/events.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus, PaymentStatus, FulfillmentStatus } from '@prisma/client';
 import { Logger } from '@nestjs/common';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @Injectable()
 export class OrderService {
@@ -477,5 +479,139 @@ export class OrderService {
       },
       totalRevenue: totalRevenue._sum.totalAmount || 0,
     };
+  }
+  async updateStatus(
+    orderId: string,
+    updateStatusDto: UpdateOrderStatusDto,
+    user: any,
+  ) {
+    const { status, reason } = updateStatusDto;
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Orden con ID ${orderId} no encontrada`);
+    }
+
+    // 2. Validar permisos según el rol
+    if (user.role !== 'ADMIN' && order.userId !== user.id) {
+      throw new ForbiddenException('No tienes permiso para modificar esta orden');
+    }
+
+    // 3. Validar que el estado nuevo sea diferente
+    if (order.status === status) {
+      throw new BadRequestException(`La orden ya está en estado ${status}`);
+    }
+
+    // 4. Validar transición de estado permitida
+    this.validateStatusTransition(order.status, status, user.role);
+
+    // 5. Actualizar la orden
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      // Actualizar la orden
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status,
+          ...(status === OrderStatus.CANCELLED && { cancelledAt: new Date() }),
+          ...(status === OrderStatus.DELIVERED && { deliveredAt: new Date() }),
+        },
+        include: {
+          items: true,
+        },
+      });
+
+      // Registrar en historial de cambios
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          reason: reason || `Cambio realizado por ${user.role}: ${user.id}`,
+          status,
+        },
+      });
+
+      return updated;
+    });
+
+    this.logger.log(`✅ Orden ${orderId} actualizada: ${order.status} → ${status}`);
+
+    return updatedOrder;
+  }
+  private validateStatusTransition(
+    currentStatus: OrderStatus,
+    newStatus: OrderStatus,
+    userRole: string,
+  ) {
+    // Matriz de transiciones permitidas
+    const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
+      [OrderStatus.PENDING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+      [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+      [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+      [OrderStatus.DELIVERED]: [], // No se puede cambiar desde DELIVERED
+      [OrderStatus.CANCELLED]: [], // No se puede cambiar desde CANCELLED
+      [OrderStatus.REFUNDED]: [], // No se puede cambiar desde REFUNDED
+    };
+
+    // Verificar si la transición está permitida
+    const allowed = allowedTransitions[currentStatus]?.includes(newStatus);
+
+    if (!allowed) {
+      // Los admins pueden forzar ciertos cambios
+      if (userRole === 'ADMIN' && this.isAdminForcedTransition(currentStatus, newStatus)) {
+        this.logger.warn(`⚠️ Admin forzando transición: ${currentStatus} → ${newStatus}`);
+        return;
+      }
+
+      throw new BadRequestException(
+        `No se puede cambiar de ${currentStatus} a ${newStatus}`,
+      );
+    }
+  }
+  private isAdminForcedTransition(
+    currentStatus: OrderStatus,
+    newStatus: OrderStatus,
+  ): boolean {
+    const adminForcedTransitions: Record<OrderStatus, OrderStatus[]> = {
+      [OrderStatus.DELIVERED]: [OrderStatus.REFUNDED], // Permitir reembolso incluso después de entregado
+      [OrderStatus.CANCELLED]: [], // No permitir reactivar canceladas
+      [OrderStatus.REFUNDED]: [], // No permitir cambios en reembolsadas
+      [OrderStatus.PENDING]: [OrderStatus.CANCELLED, OrderStatus.SHIPPED],
+      [OrderStatus.PROCESSING]: [OrderStatus.CANCELLED, OrderStatus.SHIPPED],
+      [OrderStatus.SHIPPED]: [OrderStatus.CANCELLED, OrderStatus.DELIVERED],
+    };
+
+    return adminForcedTransitions[currentStatus]?.includes(newStatus) || false;
+  }
+  async cancelOrder(orderId: string, userId: string, reason?: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+
+    if (order.userId !== userId) {
+      throw new ForbiddenException('No puedes cancelar órdenes de otro usuario');
+    }
+
+    const allowedStatuses: OrderStatus[] = [
+      OrderStatus.PENDING,
+      OrderStatus.SHIPPED,
+    ];
+    if (!allowedStatuses.includes(order.status)) {
+      throw new BadRequestException(
+        `No se puede cancelar una orden en estado ${order.status}`,
+      );
+    }
+
+    return this.updateStatus(
+      orderId, 
+      { status: OrderStatus.CANCELLED, reason: reason || 'Cancelado por el usuario' },
+      { id: userId, role: 'USER' },
+    );
   }
 }
