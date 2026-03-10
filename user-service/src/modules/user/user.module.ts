@@ -13,11 +13,13 @@ import { EmailModule } from 'src/email/email.module';
 import { ConfigModule } from '@nestjs/config';
 import { JwtStrategy } from '../auth/jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
+import { RabbitModule } from './user.rabit.module';
 
 @Module({
   imports: [
     RedisModule,
     PassportModule,
+    RabbitModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -42,11 +44,21 @@ import { PassportModule } from '@nestjs/passport';
         name: 'USER_SERVICE',
         transport: Transport.RMQ,
         options: {
-          urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
-          queue: 'user_service_queue',
+          urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
+          queue: 'user_requests',
           queueOptions: {
-            durable: false,
+            durable: true,
+            // Configuración importante para evitar el error
+            autoDelete: false,
+            arguments: {
+              'x-queue-type': 'classic',
+            },
           },
+          // Configuración de la cola de respuestas
+          replyQueue: 'amq.rabbitmq.reply-to', // Usar reply-to queue de RabbitMQ
+          persistent: true,
+          noAck: true,
+          prefetchCount: 1, // Procesar un mensaje a la vez
         },
       },
     ]),

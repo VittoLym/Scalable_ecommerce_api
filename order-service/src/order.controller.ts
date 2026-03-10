@@ -4,12 +4,9 @@ import {
   Get,
   Post,
   Patch,
-  Delete,
   Param,
   Body,
   Query,
-  UseGuards,
-  Req,
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
@@ -19,14 +16,16 @@ import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus } from '@prisma/client';
-import { Roles } from '../decorator/role.decorator';
-import { User } from '../decorator/user.decorator';
+import { Public } from 'decorator/public.decorator';
+import { Roles } from 'decorator/role.decorator';
+import { User } from 'decorator/user.decorator';
 
 @Controller('orders')
 export class OrderController {
   private readonly logger = new Logger(OrderController.name);
   constructor(private readonly orderService: OrderService) {}
   @Post()
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createOrderDto: CreateOrderDto, @User() user: any) {
     this.logger.log(`📝 Creando orden para usuario: ${user.id}`);
@@ -40,7 +39,6 @@ export class OrderController {
     };
   }
   @Get()
-  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async findAll(
     @Query('status') status?: OrderStatus,
@@ -56,7 +54,6 @@ export class OrderController {
     };
   }
   @Get('stats')
-  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async getStats() {
     this.logger.log('📊 Obteniendo estadísticas de órdenes');
@@ -68,7 +65,6 @@ export class OrderController {
     };
   }
   @Get('number/:orderNumber')
-  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async findByOrderNumber(@Param('orderNumber') orderNumber: string) {
     this.logger.log(`🔍 Buscando orden por número: ${orderNumber}`);
@@ -82,7 +78,7 @@ export class OrderController {
   @Get('my-orders')
   @HttpCode(HttpStatus.OK)
   async findMyOrders(@User() user: any, @Query('status') status?: OrderStatus) {
-    this.logger.log(`👤 Obteniendo órdenes del usuario: ${user.id}`);
+    this.logger.log(`👤 Obteniendo órdenes del usuario: ${user}`);
     const orders = await this.orderService.findByUser(user.id);
     return {
       success: true,
@@ -91,7 +87,6 @@ export class OrderController {
     };
   }
   @Get('user/:userId')
-  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async findByUser(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -184,7 +179,6 @@ export class OrderController {
     };
   }
   @Patch(':id/reject')
-  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async rejectOrder(
     @Param('id', ParseUUIDPipe) id: string,
@@ -199,7 +193,6 @@ export class OrderController {
     };
   }
   @Post(':id/refund')
-  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async refundOrder(
     @Param('id', ParseUUIDPipe) id: string,
@@ -214,7 +207,6 @@ export class OrderController {
     };
   }
   @Patch(':id/status')
-  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async updateStatus(
     @Param('id', ParseUUIDPipe) id: string,

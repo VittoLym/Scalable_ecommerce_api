@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Controller,
   Get,
@@ -12,11 +13,11 @@ import {
   Req,
   Inject,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
-import { ClientProxy, MessagePattern, Payload } from '@nestjs/microservices';
+import { ClientProxy } from '@nestjs/microservices';
 import { UserService } from './user.service';
 import { RegisterUserDto } from './dto/user-register.dto';
-import { UserResponseDto } from './dto/user-response.dto';
 import { LoginUserDto } from '../auth/dto/login.dto';
 import type { Request } from 'express';
 import { RedisService } from '../redis/redis.service';
@@ -30,6 +31,7 @@ import { AuthService } from '../auth/auth.service';
 @Controller('users')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 export class UserController {
+  private readonly logger = new Logger(UserController.name);
   constructor(
     private readonly userService: UserService,
     @Inject('PRODUCT_SERVICE') private productClient: ClientProxy, // Opcional: para comunicarse con order-service
@@ -154,118 +156,5 @@ export class UserController {
   @Roles(Role.ADMIN)
   async softDelete(@Param('id') id: string): Promise<void> {
     await this.userService.softDelete(id);
-  }
-  @MessagePattern('ping')
-  handlePing(@Payload() data: any) {
-    console.log('📡 Ping recibido en product-service desde:', data?.from);
-    return {
-      pong: true,
-      timestamp: new Date().toISOString(),
-      service: 'product-service',
-      receivedFrom: data?.from || 'pikiblainder'
-    };
-  }
-  @MessagePattern('get_user_by_id')
-  async handleGetUserById(@Payload() data: { userId: string }) {
-    try {
-      const user = await this.userService.findById(data.userId);
-      return {
-        success: true,
-        data: user,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-  @MessagePattern('validate_users')
-  async handleValidateUsers(@Payload() data: { userIds: string[] }) {
-    try {
-      const users = await Promise.all(
-        data.userIds.map(async (userId) => {
-          try {
-            const user = await this.userService.findById(userId);
-            return {
-              userId,
-              exists: true,
-              user: user,
-            };
-          } catch {
-            return {
-              userId,
-              exists: false,
-            };
-          }
-        }),
-      );
-
-      return {
-        success: true,
-        data: users,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-  @MessagePattern('get_user_profile')
-  async handleGetUserProfile(@Payload() data: { userId: string }) {
-    try {
-      const user = await this.userService.findById(data.userId);
-      // Devolver solo información relevante para otros servicios
-      return {
-        success: true,
-        data: {
-          id: user.id,
-          email: user.email,
-          fullName: user.profile?.fullName,
-          role: user.role,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-  @MessagePattern('user_exists')
-  async handleUserExists(@Payload() data: { userId: string }) {
-    try {
-      await this.userService.findById(data.userId);
-      return {
-        success: true,
-        data: {
-          exists: true,
-          userId: data.userId,
-        },
-      };
-    } catch {
-      return {
-        success: true,
-        data: {
-          exists: false,
-          userId: data.userId,
-        },
-      };
-    }
-  }
-  @MessagePattern('user_updated_login')
-  async handleUserLogin(@Payload() data: { userId: string; ip?: string }) {
-    try {
-      return {
-        success: true,
-        message: 'Login recorded',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
   }
 }
