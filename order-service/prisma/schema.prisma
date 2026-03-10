@@ -69,6 +69,7 @@ model OrderItem {
   quantity          Int
   unitPrice         Decimal         @db.Decimal(10, 2) // Precio de un solo artículo en el momento de la compra
   totalPrice        Decimal         @db.Decimal(10, 2) // quantity * unitPrice
+  fulfillmentitem   FulfillmentItem[]
   @@unique([orderId, productId]) // Un producto aparece una sola vez por orden [citation:1]
   @@index([productId])
   @@map("order_items")
