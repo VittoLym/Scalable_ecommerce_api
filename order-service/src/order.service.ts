@@ -552,12 +552,13 @@ export class OrderService {
   ) {
     // Matriz de transiciones permitidas
     const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
-      [OrderStatus.PENDING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+      [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+      [OrderStatus.CONFIRMED]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED], // 👈 Estaba faltando
       [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
       [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
-      [OrderStatus.DELIVERED]: [], // No se puede cambiar desde DELIVERED
-      [OrderStatus.CANCELLED]: [], // No se puede cambiar desde CANCELLED
-      [OrderStatus.REFUNDED]: [], // No se puede cambiar desde REFUNDED
+      [OrderStatus.DELIVERED]: [OrderStatus.REFUNDED],
+      [OrderStatus.CANCELLED]: [],
+      [OrderStatus.REFUNDED]: [],
     };
 
     // Verificar si la transición está permitida
@@ -796,7 +797,6 @@ export class OrderService {
       },
     });
   }
-
   async exportToCsv(filters: ExportFilters): Promise<string> {
     this.logger.log(`📊 Exportando órdenes a CSV con filtros:`, filters);
 
@@ -942,7 +942,6 @@ export class OrderService {
 
     return rows;
   }
-
   private getTotalsRow(orders: any[]): string {
     const totalOrders = orders.length;
     const totalItems = orders.reduce((sum, order) => sum + order.items.length, 0);

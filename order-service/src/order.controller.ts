@@ -20,6 +20,7 @@ import { OrderStatus } from '@prisma/client';
 import { Public } from 'decorator/public.decorator';
 import { Roles } from 'decorator/role.decorator';
 import { User } from 'decorator/user.decorator';
+import { AddressDto } from './dto/create-order.dto';
 
 @Controller('orders')
 export class OrderController {
