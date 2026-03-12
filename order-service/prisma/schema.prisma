@@ -10,6 +10,7 @@ datasource db {
 enum OrderStatus {
   PENDING        // Pendiente de pago o procesamiento
   PROCESSING     // Pago confirmado, preparando envío
+  CONFIRMED
   SHIPPED        // Enviado
   DELIVERED      // Entregado
   CANCELLED      // Cancelado por el usuario o el sistema

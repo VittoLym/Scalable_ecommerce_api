@@ -4,6 +4,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -13,7 +14,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
-import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateOrderDto, OrderItemDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus } from '@prisma/client';
 import { Public } from 'decorator/public.decorator';
@@ -117,6 +118,18 @@ export class OrderController {
       success: true,
       message: 'Orden encontrada',
       data: order,
+    };
+  }
+  @Delete(':id')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async deleteOrder(@Param('id', ParseUUIDPipe) id: string) {
+    this.logger.log(`🗑️ Eliminando orden: ${id}`);
+    const result = await this.orderService.deleteOrder(id);
+    return {
+      success: true,
+      message: 'Orden eliminada correctamente',
+      data: result,
     };
   }
   @Post(':id/payment')
@@ -224,6 +237,82 @@ export class OrderController {
       data: dat,
     };
   }
+  @Get(':id/history')
+  @HttpCode(HttpStatus.OK)
+  async getOrderHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @User() user: any,
+  ) {
+    this.logger.log(`📜 Obteniendo historial de orden: ${id}`);
+    const history = await this.orderService.getOrderHistory(id, user);
+    return {
+      success: true,
+      message: 'Historial obtenido exitosamente',
+      data: history,
+    };
+  }
+  @Post(':id/items')
+  @HttpCode(HttpStatus.OK)
+  async addItems(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() itemsDto: { items: OrderItemDto[] },
+    @User() user: any,
+  ) {
+    this.logger.log(`➕ Agregando items a orden: ${id}`);
+    const order = await this.orderService.addItems(id, itemsDto.items, user);
+    return {
+      success: true,
+      message: 'Items agregados exitosamente',
+      data: order,
+    };
+  }
+  @Patch(':id/shipping-address')
+  @HttpCode(HttpStatus.OK)
+  async updateShippingAddress(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() addressDto: AddressDto,
+    @User() user: any,
+  ) {
+    this.logger.log(`📦 Actualizando dirección de envío: ${id}`);
+    const order = await this.orderService.updateShippingAddress(id, addressDto, user);
+    return {
+      success: true,
+      message: 'Dirección actualizada exitosamente',
+      data: order,
+    };
+  }
+  @Delete(':orderId/items/:itemId')
+  @HttpCode(HttpStatus.OK)
+  async removeItem(
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @User() user: any,
+  ) {
+    this.logger.log(`➖ Eliminando item ${itemId} de orden: ${orderId}`);
+    const order = await this.orderService.removeItem(orderId, itemId, user);
+    return {
+      success: true,
+      message: 'Item eliminado exitosamente',
+      data: order,
+    };
+  }
+  @Get('analytics/by-date')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async getOrdersByDateRange(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    this.logger.log(`📅 Órdenes entre ${startDate} y ${endDate}`);
+    const orders = await this.orderService.getOrdersByDateRange(
+      new Date(startDate),
+      new Date(endDate),
+    );
+    return {
+      success: true,
+      data: orders,
+    };
+  }
   @Get('health/check')
   @HttpCode(HttpStatus.OK)
   async healthCheck() {
@@ -232,6 +321,21 @@ export class OrderController {
       message: 'Order service is healthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+    };
+  }
+  @Get('export/csv')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async exportToCsv(
+    @Query('status') status?: OrderStatus,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    this.logger.log(`📊 Exportando órdenes a CSV`);
+    const csvData = await this.orderService.exportToCsv({ status, startDate, endDate });
+    return {
+      success: true,
+      data: csvData,
     };
   }
 }

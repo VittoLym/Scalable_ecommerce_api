@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Type } from 'class-transformer';
 import {
   IsString,
@@ -9,10 +8,12 @@ import {
   IsEmail,
   Min,
   IsObject,
+  IsUUID,
 } from 'class-validator';
 
-class OrderItemDto {
+export class OrderItemDto {
   @IsString()
+  @IsUUID()
   productId: string;
 
   @IsNumber()
@@ -32,7 +33,7 @@ class OrderItemDto {
   productSnapshot?: any;
 }
 
-class AddressDto {
+export class AddressDto {
   @IsString()
   street: string;
 
@@ -55,6 +56,7 @@ class AddressDto {
 }
 
 export class CreateOrderDto {
+  @IsUUID()
   @IsString()
   userId: string;
 

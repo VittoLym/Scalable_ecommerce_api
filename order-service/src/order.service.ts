@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -10,10 +9,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { EventsService } from './events/events.service';
-import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateOrderDto, OrderItemDto } from './dto/create-order.dto';
 import { OrderStatus, PaymentStatus, FulfillmentStatus } from '@prisma/client';
 import { Logger } from '@nestjs/common';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+
+export interface ExportFilters {
+  status?: OrderStatus;
+  startDate?: string;
+  endDate?: string;
+}
 
 @Injectable()
 export class OrderService {
@@ -613,5 +618,370 @@ export class OrderService {
       { status: OrderStatus.CANCELLED, reason: reason || 'Cancelado por el usuario' },
       { id: userId, role: 'USER' },
     );
+  }
+  async deleteOrder(id: string) {
+    this.logger.log(`🗑️ Eliminando orden: ${id}`);
+
+    const order = await this.findOne(id);
+
+    // Soft delete - solo admin puede eliminar
+    await this.prisma.order.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    this.logger.log(`✅ Orden ${id} eliminada (soft delete)`);
+    return { deleted: true, id };
+  }
+  async getOrderHistory(id: string, user: any) {
+    this.logger.log(`📜 Obteniendo historial de orden: ${id}`);
+
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+
+    if (user.role !== 'ADMIN' && order.userId !== user.id) {
+      throw new ForbiddenException('No tienes permiso para ver este historial');
+    }
+
+    return this.prisma.orderStatusHistory.findMany({
+      where: { orderId: id },
+      orderBy: { changedAt: 'desc' },
+    });
+  }
+  async updateShippingAddress(id: string, addressDto: any, user: any) {
+    this.logger.log(`📦 Actualizando dirección de envío: ${id}`);
+
+    const order = await this.findOne(id);
+
+    if (order.userId !== user.id && user.role !== 'ADMIN') {
+      throw new ForbiddenException('No tienes permiso para modificar esta orden');
+    }
+
+    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+      throw new BadRequestException(
+        `No se puede modificar dirección en estado ${order.status}`,
+      );
+    }
+
+    return this.prisma.order.update({
+      where: { id },
+      data: { shippingAddress: addressDto },
+      include: { items: true },
+    });
+  }
+  async addItems(id: string, items: OrderItemDto[], user: any) {
+    this.logger.log(`➕ Agregando ${items.length} items a orden: ${id}`);
+
+    const order = await this.findOne(id);
+
+    if (order.userId !== user.id && user.role !== 'ADMIN') {
+      throw new ForbiddenException('No tienes permiso para modificar esta orden');
+    }
+
+    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+      throw new BadRequestException(
+        `No se pueden agregar items en estado ${order.status}`,
+      );
+    }
+
+    // Agregar items y recalcular totales
+    return this.prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        await tx.orderItem.create({
+          data: {
+            orderId: id,
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            productName: item.productName,
+            productSnapshot: item.productSnapshot || {},
+          },
+        });
+      }
+
+      // Recalcular totales
+      const updatedOrder = await tx.order.findUnique({
+        where: { id },
+        include: { items: true },
+      });
+
+      const newSubtotal = updatedOrder.items.reduce(
+        (sum, item) => sum + item.unitPrice * item.quantity,
+        0,
+      );
+
+      const newTotal = newSubtotal + order.taxAmount + order.shippingAmount - order.discountAmount;
+
+      return tx.order.update({
+        where: { id },
+        data: {
+          subtotal: newSubtotal,
+          total: newTotal,
+        },
+        include: { items: true },
+      });
+    });
+  }
+  async removeItem(orderId: string, itemId: string, user: any) {
+    this.logger.log(`➖ Eliminando item ${itemId} de orden: ${orderId}`);
+
+    const order = await this.findOne(orderId);
+
+    if (order.userId !== user.id && user.role !== 'ADMIN') {
+      throw new ForbiddenException('No tienes permiso para modificar esta orden');
+    }
+
+    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+      throw new BadRequestException(
+        `No se pueden eliminar items en estado ${order.status}`,
+      );
+    }
+
+    const item = await this.prisma.orderItem.findFirst({
+      where: { id: itemId, orderId },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Item no encontrado');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.orderItem.delete({ where: { id: itemId } });
+
+      const updatedOrder = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+
+      const newSubtotal = updatedOrder.items.reduce(
+        (sum, item) => sum + item.unitPrice * item.quantity,
+        0,
+      );
+
+      const newTotal = newSubtotal + order.taxAmount + order.shippingAmount - order.discountAmount;
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          subtotal: newSubtotal,
+          total: newTotal,
+        },
+        include: { items: true },
+      });
+    });
+  }
+  async getOrdersByDateRange(startDate: Date, endDate: Date) {
+    this.logger.log(`📅 Buscando órdenes entre ${startDate} y ${endDate}`);
+
+    return this.prisma.order.findMany({
+      where: {
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        items: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async exportToCsv(filters: ExportFilters): Promise<string> {
+    this.logger.log(`📊 Exportando órdenes a CSV con filtros:`, filters);
+
+    try {
+      // Construir filtros para la consulta
+      const where: any = {};
+
+      if (filters.status) {
+        where.status = filters.status;
+      }
+
+      if (filters.startDate || filters.endDate) {
+        where.createdAt = {};
+        if (filters.startDate) {
+          where.createdAt.gte = new Date(filters.startDate);
+        }
+        if (filters.endDate) {
+          where.createdAt.lte = new Date(filters.endDate);
+        }
+      }
+
+      // Obtener órdenes con sus items
+      const orders = await this.prisma.order.findMany({
+        where,
+        include: {
+          items: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      this.logger.log(`✅ ${orders.length} órdenes encontradas para exportar`);
+
+      if (orders.length === 0) {
+        return this.getEmptyCsv();
+      }
+
+      // Generar CSV
+      const csvRows = [];
+
+      // 1. Encabezados
+      csvRows.push(this.getCsvHeaders());
+
+      // 2. Datos de las órdenes
+      for (const order of orders) {
+        const orderRows = this.orderToCsvRows(order);
+        csvRows.push(...orderRows);
+      }
+
+      // 3. Fila de totales
+      csvRows.push(this.getTotalsRow(orders));
+
+      return csvRows.join('\n');
+    } catch (error) {
+      this.logger.error(`❌ Error exportando a CSV: ${error.message}`, error.stack);
+      throw new BadRequestException('Error generando archivo CSV');
+    }
+  }
+  private getCsvHeaders(): string {
+    const headers = [
+      'Número de Orden',
+      'Fecha',
+      'Cliente ID',
+      'Cliente Email',
+      'Estado',
+      'Producto ID',
+      'Producto Nombre',
+      'Cantidad',
+      'Precio Unitario',
+      'Subtotal Item',
+      'Subtotal Orden',
+      'Impuesto',
+      'Envío',
+      'Descuento',
+      'Total',
+      'Dirección Envío',
+      'Notas',
+    ];
+
+    return headers.join(',');
+  }
+  private orderToCsvRows(order: any): string[] {
+    const rows: string[] = [];
+    const date = new Date(order.createdAt).toLocaleDateString('es-AR');
+
+    // Escapar campos que puedan contener comas
+    const shippingAddress = this.escapeCsvField(
+      `${order.shippingAddress.street}, ${order.shippingAddress.city}, ${order.shippingAddress.zipCode}, ${order.shippingAddress.country}`
+    );
+
+    const notes = this.escapeCsvField(order.notes || '');
+
+    // Por cada item, crear una fila
+    for (const item of order.items) {
+      const row = [
+        order.orderNumber,
+        date,
+        order.userId,
+        order.userEmail || '',
+        order.status,
+        item.productId,
+        this.escapeCsvField(item.productName || ''),
+        item.quantity,
+        item.unitPrice.toFixed(2),
+        (item.quantity * item.unitPrice).toFixed(2),
+        order.subtotal.toFixed(2),
+        order.taxAmount?.toFixed(2) || '0.00',
+        order.shippingAmount?.toFixed(2) || '0.00',
+        order.discountAmount?.toFixed(2) || '0.00',
+        order.total.toFixed(2),
+        shippingAddress,
+        notes,
+      ];
+
+      rows.push(row.join(','));
+    }
+
+    // Si la orden no tiene items, crear una fila sin items
+    if (order.items.length === 0) {
+      const row = [
+        order.orderNumber,
+        date,
+        order.userId,
+        order.userEmail || '',
+        order.status,
+        'SIN ITEMS',
+        '',
+        '',
+        '',
+        '',
+        order.subtotal.toFixed(2),
+        order.taxAmount?.toFixed(2) || '0.00',
+        order.shippingAmount?.toFixed(2) || '0.00',
+        order.discountAmount?.toFixed(2) || '0.00',
+        order.total.toFixed(2),
+        shippingAddress,
+        notes,
+      ];
+
+      rows.push(row.join(','));
+    }
+
+    return rows;
+  }
+
+  private getTotalsRow(orders: any[]): string {
+    const totalOrders = orders.length;
+    const totalItems = orders.reduce((sum, order) => sum + order.items.length, 0);
+    const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
+    const totalTax = orders.reduce((sum, order) => sum + (order.taxAmount || 0), 0);
+    const totalShipping = orders.reduce((sum, order) => sum + (order.shippingAmount || 0), 0);
+    const totalDiscount = orders.reduce((sum, order) => sum + (order.discountAmount || 0), 0);
+
+    return [
+      'TOTALES',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      totalItems,
+      '',
+      '',
+      '',
+      totalTax.toFixed(2),
+      totalShipping.toFixed(2),
+      totalDiscount.toFixed(2),
+      totalRevenue.toFixed(2),
+      `Total Órdenes: ${totalOrders}`,
+      '',
+    ].join(',');
+  }
+  private getEmptyCsv(): string {
+    const headers = this.getCsvHeaders();
+    const message = this.escapeCsvField('No se encontraron órdenes para los filtros seleccionados');
+    return `${headers}\n"${message}"`;
+  }
+  private escapeCsvField(field: string): string {
+    if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+      // Reemplazar comillas dobles por dos comillas dobles
+      const escaped = field.replace(/"/g, '""');
+      return `"${escaped}"`;
+    }
+    return field;
   }
 }
