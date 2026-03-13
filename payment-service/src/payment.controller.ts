@@ -8,6 +8,6 @@ export class PaymentController {
 
   @Post('create')
   async createPayment(@Body() dto: CreatePaymentDto) {
-    return this.paymentService.createPreference(dto);
+    return this.paymentService.createPayment(dto);
   }
 }

@@ -1,33 +1,45 @@
 import { Injectable } from '@nestjs/common';
-import mercadopago from './payments/MercadoPago/mercadopago.config';
+import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { CreatePaymentDto } from './payments/dto/create-payment.dto';
 
 @Injectable()
 export class PaymentService {
-  async createPreference(data: CreatePaymentDto) {
-    const preference = {
-      items: [
-        {
-          title: data.description,
-          quantity: 1,
-          unit_price: data.amount,
-        },
-      ],
-      metadata: {
-        orderId: data.orderId,
-      },
-      back_urls: {
-        success: 'http://localhost:3000/payment/success',
-        failure: 'http://localhost:3000/payment/failure',
-      },
-      auto_return: 'approved',
-    };
+  private client: MercadoPagoConfig;
 
-    const response = await mercadopago.preferences.create(preference);
+  constructor() {
+    this.client = new MercadoPagoConfig({
+      accessToken: process.env.MP_ACCESS_TOKEN!,
+    });
+  }
+
+  async createPayment(dto: CreatePaymentDto) {
+    const preference = new Preference(this.client);
+
+    const response = await preference.create({
+      body: {
+        items: [
+          {
+            id: 'mandarina',
+            title: dto.description,
+            quantity: 1,
+            unit_price: dto.amount,
+          },
+        ],
+        metadata: {
+          orderId: dto.orderId,
+        },
+        back_urls: {
+          success: 'http://localhost:3000/payment/success',
+          failure: 'http://localhost:3000/payment/failure',
+          pending: 'http://localhost:3000/payment/pending',
+        },
+        auto_return: 'approved',
+      },
+    });
 
     return {
-      checkoutUrl: response.body.init_point,
-      preferenceId: response.body.id,
+      checkoutUrl: response.init_point,
+      preferenceId: response.id,
     };
   }
 }
