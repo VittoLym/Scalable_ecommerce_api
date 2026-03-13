@@ -14,9 +14,10 @@ export class PaymentService {
 
   async createPayment(dto: CreatePaymentDto) {
     const preference = new Preference(this.client);
-
     const response = await preference.create({
       body: {
+        binary_mode: true,
+        purpose: 'wallet_purchase',
         items: [
           {
             id: 'mandarina',
@@ -25,13 +26,31 @@ export class PaymentService {
             unit_price: dto.amount,
           },
         ],
+        payer: {
+          name: 'Juan',
+          surname: 'Lopez',
+          email: 'user@email.com',
+          phone: {
+            area_code: '11',
+            number: '4444-4444',
+          },
+          identification: {
+            type: 'DNI',
+            number: '12345678',
+          },
+          address: {
+            street_name: 'Street',
+            street_number: '123',
+            zip_code: '5700',
+          },
+        },
         metadata: {
           orderId: dto.orderId,
         },
         back_urls: {
-          success: 'http://localhost:3000/payment/success',
-          failure: 'http://localhost:3000/payment/failure',
-          pending: 'http://localhost:3000/payment/pending',
+          success: 'https://localhost:3004/payment/success',
+          failure: 'https://localhost:3004/payment/failure',
+          pending: 'https://localhost:3004/payment/pending',
         },
         auto_return: 'approved',
       },
