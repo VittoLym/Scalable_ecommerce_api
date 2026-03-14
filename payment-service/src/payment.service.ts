@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { CreatePaymentDto } from './payments/dto/create-payment.dto';
 
 @Injectable()
@@ -9,6 +9,7 @@ export class PaymentService {
   constructor() {
     this.client = new MercadoPagoConfig({
       accessToken: process.env.MP_ACCESS_TOKEN!,
+      options: { timeout: 5000 },
     });
   }
 
@@ -17,7 +18,6 @@ export class PaymentService {
     const response = await preference.create({
       body: {
         binary_mode: true,
-        purpose: 'wallet_purchase',
         items: [
           {
             id: 'mandarina',

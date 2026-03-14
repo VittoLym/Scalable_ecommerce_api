@@ -22,6 +22,11 @@ export class PaymentController {
     console.log(payment);
     return payment;
   }
+  @Post('process_payment')
+  async proccessPayment(data){
+    console.log(data);
+    return data;
+  }
   @Get()
   test1() {
     setTimeout(() => {
