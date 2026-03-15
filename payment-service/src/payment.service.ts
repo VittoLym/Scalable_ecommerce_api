@@ -19,12 +19,10 @@ export class PaymentService {
     private readonly orderRabbitClient: OrderRabbitClient,
     private configService: ConfigService,
   ) {
-    const accessToken = this.configService.get<string>(
-      'MERCADOPAGO_ACCESS_TOKEN',
-    );
+    const accessToken = this.configService.get<string>('MP_ACCESS_TOKEN');
     if (!accessToken) {
       throw new InternalServerErrorException(
-        'MERCADOPAGO_ACCESS_TOKEN no está configurado en las variables de entorno',
+        'MP_ACCESS_TOKEN no está configurado en las variables de entorno',
       );
     }
     this.client = new MercadoPagoConfig({

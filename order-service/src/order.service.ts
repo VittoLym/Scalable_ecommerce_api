@@ -13,6 +13,9 @@ import { CreateOrderDto, OrderItemDto } from './dto/create-order.dto';
 import { OrderStatus, PaymentStatus, FulfillmentStatus } from '@prisma/client';
 import { Logger } from '@nestjs/common';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+import { StatusUtils } from './utils/status.utils';
+import { NumberUtils } from './utils/number.utils';
 
 export interface ExportFilters {
   status?: OrderStatus;
@@ -581,12 +584,25 @@ export class OrderService {
     newStatus: OrderStatus,
   ): boolean {
     const adminForcedTransitions: Record<OrderStatus, OrderStatus[]> = {
-      [OrderStatus.DELIVERED]: [OrderStatus.REFUNDED], // Permitir reembolso incluso después de entregado
-      [OrderStatus.CANCELLED]: [], // No permitir reactivar canceladas
-      [OrderStatus.REFUNDED]: [], // No permitir cambios en reembolsadas
-      [OrderStatus.PENDING]: [OrderStatus.CANCELLED, OrderStatus.SHIPPED],
-      [OrderStatus.PROCESSING]: [OrderStatus.CANCELLED, OrderStatus.SHIPPED],
-      [OrderStatus.SHIPPED]: [OrderStatus.CANCELLED, OrderStatus.DELIVERED],
+      [OrderStatus.PENDING]: [
+        OrderStatus.CONFIRMED,
+        OrderStatus.PROCESSING,
+        OrderStatus.SHIPPED,
+      ],
+      [OrderStatus.CONFIRMED]: [
+        OrderStatus.PROCESSING,
+        OrderStatus.SHIPPED,
+        OrderStatus.CANCELLED,
+      ], // 👈 AGREGADO
+      [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+      [OrderStatus.SHIPPED]: [
+        OrderStatus.DELIVERED,
+        OrderStatus.CANCELLED,
+        OrderStatus.REFUNDED,
+      ],
+      [OrderStatus.DELIVERED]: [OrderStatus.REFUNDED],
+      [OrderStatus.CANCELLED]: [],
+      [OrderStatus.REFUNDED]: [],
     };
 
     return adminForcedTransitions[currentStatus]?.includes(newStatus) || false;
@@ -601,12 +617,14 @@ export class OrderService {
     }
 
     if (order.userId !== userId) {
-      throw new ForbiddenException('No puedes cancelar órdenes de otro usuario');
+      throw new ForbiddenException(
+        'No puedes cancelar órdenes de otro usuario',
+      );
     }
 
     const allowedStatuses: OrderStatus[] = [
       OrderStatus.PENDING,
-      OrderStatus.SHIPPED,
+      OrderStatus.CONFIRMED,
     ];
     if (!allowedStatuses.includes(order.status)) {
       throw new BadRequestException(
@@ -615,8 +633,11 @@ export class OrderService {
     }
 
     return this.updateStatus(
-      orderId, 
-      { status: OrderStatus.CANCELLED, reason: reason || 'Cancelado por el usuario' },
+      orderId,
+      {
+        status: OrderStatus.CANCELLED,
+        reason: reason || 'Cancelado por el usuario',
+      },
       { id: userId, role: 'USER' },
     );
   }
@@ -624,15 +645,12 @@ export class OrderService {
     this.logger.log(`🗑️ Eliminando orden: ${id}`);
 
     const order = await this.findOne(id);
-
-    // Soft delete - solo admin puede eliminar
     await this.prisma.order.update({
       where: { id },
       data: {
         deletedAt: new Date(),
       },
     });
-
     this.logger.log(`✅ Orden ${id} eliminada (soft delete)`);
     return { deleted: true, id };
   }
@@ -654,21 +672,21 @@ export class OrderService {
 
     return this.prisma.orderStatusHistory.findMany({
       where: { orderId: id },
-      orderBy: { changedAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
   }
   async updateShippingAddress(id: string, addressDto: any, user: any) {
     this.logger.log(`📦 Actualizando dirección de envío: ${id}`);
 
     const order = await this.findOne(id);
-
-    if (order.userId !== user.id && user.role !== 'ADMIN') {
-      throw new ForbiddenException('No tienes permiso para modificar esta orden');
-    }
-
-    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+    if (
+      !StatusUtils.isStatusAllowed(
+        order.status,
+        StatusUtils.CANCELLABLE_STATUSES,
+      )
+    ) {
       throw new BadRequestException(
-        `No se puede modificar dirección en estado ${order.status}`,
+        `No se puede modificar una orden en estado ${order.status}`,
       );
     }
 
@@ -682,27 +700,28 @@ export class OrderService {
     this.logger.log(`➕ Agregando ${items.length} items a orden: ${id}`);
 
     const order = await this.findOne(id);
-
-    if (order.userId !== user.id && user.role !== 'ADMIN') {
-      throw new ForbiddenException('No tienes permiso para modificar esta orden');
-    }
-
-    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+    if (
+      !StatusUtils.isStatusAllowed(
+        order.status,
+        StatusUtils.CANCELLABLE_STATUSES,
+      )
+    ) {
       throw new BadRequestException(
-        `No se pueden agregar items en estado ${order.status}`,
+        `No se puede modificar una orden en estado ${order.status}`,
       );
     }
-
     // Agregar items y recalcular totales
     return this.prisma.$transaction(async (tx) => {
       for (const item of items) {
+        const unitPrice = NumberUtils.toNumber(item.unitPrice);
+        const subtotal = unitPrice * item.quantity;
         await tx.orderItem.create({
           data: {
             orderId: id,
             productId: item.productId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            productName: item.productName,
+            totalPrice: subtotal,
             productSnapshot: item.productSnapshot || {},
           },
         });
@@ -713,19 +732,20 @@ export class OrderService {
         where: { id },
         include: { items: true },
       });
+      if (!updatedOrder) {
+        throw new NotFoundException(
+          'Orden no encontrada después de actualizar',
+        );
+      }
+      const newSubtotal = NumberUtils.calculateSubtotal(updatedOrder.items);
 
-      const newSubtotal = updatedOrder.items.reduce(
-        (sum, item) => sum + item.unitPrice * item.quantity,
-        0,
-      );
-
-      const newTotal = newSubtotal + order.taxAmount + order.shippingAmount - order.discountAmount;
+      const newTotal = newSubtotal;
 
       return tx.order.update({
         where: { id },
         data: {
           subtotal: newSubtotal,
-          total: newTotal,
+          totalAmount: newTotal,
         },
         include: { items: true },
       });
@@ -737,12 +757,18 @@ export class OrderService {
     const order = await this.findOne(orderId);
 
     if (order.userId !== user.id && user.role !== 'ADMIN') {
-      throw new ForbiddenException('No tienes permiso para modificar esta orden');
+      throw new ForbiddenException(
+        'No tienes permiso para modificar esta orden',
+      );
     }
-
-    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+    if (
+      !StatusUtils.isStatusAllowed(
+        order.status,
+        StatusUtils.CANCELLABLE_STATUSES,
+      )
+    ) {
       throw new BadRequestException(
-        `No se pueden eliminar items en estado ${order.status}`,
+        `No se puede modificar una orden en estado ${order.status}`,
       );
     }
 
@@ -761,19 +787,19 @@ export class OrderService {
         where: { id: orderId },
         include: { items: true },
       });
-
-      const newSubtotal = updatedOrder.items.reduce(
-        (sum, item) => sum + item.unitPrice * item.quantity,
-        0,
-      );
-
-      const newTotal = newSubtotal + order.taxAmount + order.shippingAmount - order.discountAmount;
+      if (updatedOrder == null) {
+        throw new NotFoundException(
+          'Orden no encontrada después de actualizar',
+        );
+      }
+      const newSubtotal = NumberUtils.calculateSubtotal(updatedOrder.items);
+      const newTotal = newSubtotal;
 
       return tx.order.update({
         where: { id: orderId },
         data: {
           subtotal: newSubtotal,
-          total: newTotal,
+          totalAmount: newTotal,
         },
         include: { items: true },
       });
@@ -801,6 +827,7 @@ export class OrderService {
     this.logger.log(`📊 Exportando órdenes a CSV con filtros:`, filters);
 
     try {
+      const csvRows: string[] = [];
       // Construir filtros para la consulta
       const where: any = {};
 
@@ -835,9 +862,6 @@ export class OrderService {
         return this.getEmptyCsv();
       }
 
-      // Generar CSV
-      const csvRows = [];
-
       // 1. Encabezados
       csvRows.push(this.getCsvHeaders());
 
@@ -852,7 +876,10 @@ export class OrderService {
 
       return csvRows.join('\n');
     } catch (error) {
-      this.logger.error(`❌ Error exportando a CSV: ${error.message}`, error.stack);
+      this.logger.error(
+        `❌ Error exportando a CSV: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Error generando archivo CSV');
     }
   }
@@ -1004,9 +1031,10 @@ export class OrderService {
     if (!order) {
       throw new NotFoundException(`Orden con ID ${orderId} no encontrada`);
     }
-    const hasExistingPayment = order.payments?.some(
-      payment => payment.status === 'PAID' || payment.status === 'SUCCESS'
-    );
+    const hasExistingPayment = order.payments?.some((payment) => {
+      console.log('Payment status:', payment.status);
+      return payment.status === 'PAID';
+    });
 
     if (hasExistingPayment) {
       throw new BadRequestException('La orden ya tiene un pago confirmado');
@@ -1031,29 +1059,20 @@ export class OrderService {
       await tx.orderStatusHistory.create({
         data: {
           orderId,
-          oldStatus: order.status,
-          newStatus: paymentData.paymentStatus === 'PAID' ? OrderStatus.CONFIRMED : order.status,
+          status:
+            paymentData.paymentStatus === 'PAID'
+              ? OrderStatus.CONFIRMED
+              : order.status,
           reason: `Pago ${paymentData.paymentStatus === 'PAID' ? 'aprobado' : paymentData.paymentStatus}`,
-          changedBy: 'system',
-          metadata: {
-            paymentId: paymentData.paymentId,
-            paymentStatus: paymentData.paymentStatus,
-          },
         },
       });
-
-      // Si el pago fue exitoso, crear registro de pago
       if (paymentData.paymentStatus === 'PAID') {
         await tx.payment.create({
           data: {
-            paymentId: paymentData.paymentId,
             orderId,
-            amount: order.total,
+            amount: order.totalAmount,
             status: 'PAID',
-            metadata: {
-              previousStatus: order.paymentStatus,
-              paymentDate: paymentData.paymentDate,
-            },
+            paymentMethod: 'Visa',
           },
         });
       }
@@ -1065,5 +1084,28 @@ export class OrderService {
       `✅ Pago actualizado para orden ${orderId}: ${paymentData.paymentStatus}`,
     );
     return updatedOrder;
+  }
+  @MessagePattern('order.get_by_id')
+  async getOrderById(@Payload() data: { orderId: string }) {
+    this.logger.log(`📨 Recibida solicitud de orden: ${data.orderId}`);
+    try {
+      const order = await this.findOne(data.orderId);
+      return {
+        success: true,
+        data: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          userId: order.userId,
+          total: order.totalAmount,
+          status: order.status,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`❌ Error obteniendo orden: ${error.message}`);
+      return {
+        success: false,
+        error: 'Orden no encontrada',
+      };
+    }
   }
 }

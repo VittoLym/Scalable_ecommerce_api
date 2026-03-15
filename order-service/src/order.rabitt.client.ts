@@ -1,16 +1,74 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, Logger, Inject } from '@nestjs/common';
+// payment-service/src/rabbit/order-rabbit.client.ts
+import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { lastValueFrom, timeout, catchError, throwError } from 'rxjs';
-import { TimeoutError } from 'rxjs';
+import {
+  lastValueFrom,
+  timeout,
+  catchError,
+  throwError,
+  TimeoutError,
+} from 'rxjs';
 
 @Injectable()
-export class OrderRabbitClient {
+export class OrderRabbitClient implements OnModuleInit {
   private readonly logger = new Logger(OrderRabbitClient.name);
-  private readonly timeoutMs = 5000; // 5 segundos de timeout
+  private readonly timeoutMs = 5000;
+  private isConnected = false;
 
-  constructor(@Inject('USER_SERVICE') private readonly client: ClientProxy) {}
+  constructor(@Inject('ORDER_SERVICE') private readonly client: ClientProxy) {}
 
+  async onModuleInit() {
+    await this.connectWithRetry();
+  }
+
+  private async connectWithRetry(retries = 5) {
+    for (let i = 1; i <= retries; i++) {
+      try {
+        this.logger.log(`🔄 Intento ${i}/${retries} de conectar a Order Service...`);
+        await this.client.connect();
+        this.isConnected = true;
+        this.logger.log('✅ Conectado a Order Service vía RabbitMQ');
+        return;
+      } catch (error) {
+        this.logger.error(`❌ Error conectando (intento ${i}/${retries}):`, error.message);
+        if (i === retries) {
+          this.logger.error('❌ No se pudo conectar a Order Service después de varios intentos');
+        } else {
+          await this.delay(2000 * i); // Espera progresiva
+        }
+      }
+    }
+  }
+
+  private delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async getOrderById(orderId: string): Promise<any> {
+    if (!this.isConnected) {
+      this.logger.warn('⚠️ No hay conexión con Order Service, reintentando...');
+      await this.connectWithRetry(3);
+    }
+
+    try {
+      this.logger.log(`🔍 Solicitando orden ${orderId} a Order Service`);
+      
+      const response = await lastValueFrom(
+        this.client
+          .send('order.get_by_id', { orderId })
+          .pipe(timeout(this.timeoutMs))
+      );
+
+      if (!response?.success) {
+        throw new Error(response?.error || 'Error al obtener la orden');
+      }
+
+      return response.data;
+    } catch (error) {
+      this.logger.error(`❌ Error obteniendo orden: ${error.message}`);
+      throw error;
+    }
+  }
   async onApplicationBootstrap() {
     await this.client.connect();
     this.logger.log('✅ Conectado a RabbitMQ');

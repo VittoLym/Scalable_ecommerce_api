@@ -19,12 +19,16 @@ import { APP_GUARD } from '@nestjs/core';
     EventsModule,
     ClientsModule.register([
       {
-        name: 'RABBITMQ_SERVICE',
+        name: 'ORDER_SERVICE',
         transport: Transport.RMQ,
         options: {
-          urls: [`${process.env.RABBITMQ_URL!}`],
-          queue: 'order_queue',
-          queueOptions: { durable: false },
+          urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
+          queue: 'order_service_queue',
+          queueOptions: {
+            durable: false,
+          },
+          persistent: true,
+          noAck: true,
         },
       },
       {
