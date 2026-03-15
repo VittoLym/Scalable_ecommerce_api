@@ -50,6 +50,9 @@ model Order {
   contactPhone      String?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+  paymentId      String?   // ID del pago en Mercado Pago
+  paymentStatus  String?   // PAID, FAILED, PENDING, REFUNDED
+  paymentDate    DateTime? // Fecha del pago
   items             OrderItem[]
   payments          Payment[]
   fulfillments      Fulfillment[]

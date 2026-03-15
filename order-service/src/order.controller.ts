@@ -21,6 +21,7 @@ import { Public } from 'decorator/public.decorator';
 import { Roles } from 'decorator/role.decorator';
 import { User } from 'decorator/user.decorator';
 import { AddressDto } from './dto/create-order.dto';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller('orders')
 export class OrderController {
@@ -338,5 +339,47 @@ export class OrderController {
       success: true,
       data: csvData,
     };
+  }
+  @MessagePattern('order.get_by_id')
+  async getOrderById(@Payload() data: { orderId: string }) {
+    try {
+      const order = await this.orderService.findOne(data.orderId);
+      return {
+        success: true,
+        data: order,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  @MessagePattern('order.update_payment_status')
+  async updatePaymentStatus(
+    @Payload()
+    data: {
+      orderId: string;
+      paymentId: string;
+      paymentStatus: string;
+      paymentDate: Date;
+    },
+  ) {
+    try {
+      const order = await this.orderService.updatePaymentStatus(
+        data.orderId,
+        data,
+      );
+      return {
+        success: true,
+        data: order,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 }

@@ -9,11 +9,10 @@ import {
   Logger,
   HttpCode,
   HttpStatus,
-  Redirect,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import { CreatePaymentDto } from '../src/payments/dto/create-payment.dto';
-import { Public } from '../decorators/public.decorator';
+import { CreatePaymentDto } from './payments/dto/create-payment.dto';
+import { Public } from './decorator/public.decorator';
 
 @Controller('payment')
 export class PaymentController {
@@ -21,16 +20,11 @@ export class PaymentController {
 
   constructor(private readonly paymentService: PaymentService) {}
 
-  /**
-   * Crear un nuevo pago
-   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createPayment(@Body() createPaymentDto: CreatePaymentDto) {
     this.logger.log('💳 Creando nuevo pago');
-    
     const result = await this.paymentService.createPayment(createPaymentDto);
-    
     return {
       success: true,
       message: 'Preferencia de pago creada',
@@ -38,10 +32,6 @@ export class PaymentController {
     };
   }
 
-  /**
-   * Endpoint para pagos exitosos
-   * Mercado Pago redirige aquí
-   */
   @Get('success')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -62,21 +52,17 @@ export class PaymentController {
       preferenceId,
     });
 
-    // Puedes redirigir al frontend o mostrar una página
     return {
       success: true,
       message: 'Pago procesado exitosamente',
       data: {
         orderId: externalReference,
         paymentId,
+        order: updatedOrder,
       },
-      redirectUrl: `http://localhost:3000/orders/${externalReference}/success`,
     };
   }
 
-  /**
-   * Endpoint para pagos fallidos
-   */
   @Get('failure')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -101,13 +87,9 @@ export class PaymentController {
         paymentId,
         status,
       },
-      redirectUrl: `http://localhost:3000/orders/${externalReference}/failure`,
     };
   }
 
-  /**
-   * Endpoint para pagos pendientes
-   */
   @Get('pending')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -118,12 +100,6 @@ export class PaymentController {
   ) {
     this.logger.log(`⏳ Pago pendiente - Payment ID: ${paymentId}`);
 
-    await this.paymentService.handlePendingPayment({
-      paymentId,
-      status,
-      orderId: externalReference,
-    });
-
     return {
       success: true,
       message: 'El pago está pendiente de confirmación',
@@ -131,13 +107,9 @@ export class PaymentController {
         orderId: externalReference,
         paymentId,
       },
-      redirectUrl: `http://localhost:3000/orders/${externalReference}/pending`,
     };
   }
 
-  /**
-   * Webhook para notificaciones automáticas de Mercado Pago
-   */
   @Post('webhook')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -147,24 +119,6 @@ export class PaymentController {
     @Query('id') id?: string,
   ) {
     this.logger.log(`🔔 Webhook recibido - Topic: ${topic}, ID: ${id}`);
-
-    await this.paymentService.handleWebhook(topic, id, body);
-
     return { received: true };
-  }
-
-  /**
-   * Obtener estado del pago por orden
-   */
-  @Get('status/:orderId')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  async getPaymentStatus(@Param('orderId') orderId: string) {
-    const status = await this.paymentService.getPaymentStatus(orderId);
-    
-    return {
-      success: true,
-      data: status,
-    };
   }
 }

@@ -983,4 +983,87 @@ export class OrderService {
     }
     return field;
   }
+  async updatePaymentStatus(
+    orderId: string,
+    paymentData: {
+      paymentId: string;
+      paymentStatus: string;
+      paymentDate: Date;
+    },
+  ) {
+    this.logger.log(
+      `💳 Actualizando estado de pago de orden ${orderId} a ${paymentData.paymentStatus}`,
+    );
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        payments: true, // Incluir los pagos relacionados
+        items: true,
+      },
+    });
+    if (!order) {
+      throw new NotFoundException(`Orden con ID ${orderId} no encontrada`);
+    }
+    const hasExistingPayment = order.payments?.some(
+      payment => payment.status === 'PAID' || payment.status === 'SUCCESS'
+    );
+
+    if (hasExistingPayment) {
+      throw new BadRequestException('La orden ya tiene un pago confirmado');
+    }
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          paymentId: paymentData.paymentId,
+          paymentStatus: paymentData.paymentStatus,
+          paymentDate: paymentData.paymentDate,
+          ...(paymentData.paymentStatus === 'PAID' && {
+            status: OrderStatus.CONFIRMED,
+          }),
+        },
+        include: {
+          items: true,
+        },
+      });
+
+      // Registrar en el historial
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          oldStatus: order.status,
+          newStatus: paymentData.paymentStatus === 'PAID' ? OrderStatus.CONFIRMED : order.status,
+          reason: `Pago ${paymentData.paymentStatus === 'PAID' ? 'aprobado' : paymentData.paymentStatus}`,
+          changedBy: 'system',
+          metadata: {
+            paymentId: paymentData.paymentId,
+            paymentStatus: paymentData.paymentStatus,
+          },
+        },
+      });
+
+      // Si el pago fue exitoso, crear registro de pago
+      if (paymentData.paymentStatus === 'PAID') {
+        await tx.payment.create({
+          data: {
+            paymentId: paymentData.paymentId,
+            orderId,
+            amount: order.total,
+            status: 'PAID',
+            metadata: {
+              previousStatus: order.paymentStatus,
+              paymentDate: paymentData.paymentDate,
+            },
+          },
+        });
+      }
+
+      return updated;
+    });
+
+    this.logger.log(
+      `✅ Pago actualizado para orden ${orderId}: ${paymentData.paymentStatus}`,
+    );
+    return updatedOrder;
+  }
 }
