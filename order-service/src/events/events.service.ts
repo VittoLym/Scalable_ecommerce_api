@@ -7,9 +7,7 @@ import { Logger } from '@nestjs/common';
 export class EventsService {
   private readonly logger = new Logger(EventsService.name);
 
-  constructor(
-    @Inject('RABBITMQ_SERVICE') private readonly client: ClientProxy,
-  ) {}
+  constructor(@Inject('ORDER_SERVICE') private readonly client: ClientProxy) {}
 
   async onModuleInit() {
     await this.client.connect();

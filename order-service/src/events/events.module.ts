@@ -9,14 +9,16 @@ import { OrderModule } from 'src/order.module';
     forwardRef(() => OrderModule),
     ClientsModule.register([
       {
-        name: 'RABBITMQ_SERVICE',
+        name: 'ORDER_SERVICE',
         transport: Transport.RMQ,
         options: {
-          urls: [process.env.RABBITMQ_URL || 'amqp://localhost'],
+          urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
           queue: 'order_service_queue',
           queueOptions: {
             durable: false,
           },
+          persistent: true,
+          noAck: true,
         },
       },
     ]),

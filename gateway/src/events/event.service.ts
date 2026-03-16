@@ -4,7 +4,7 @@ import { ClientProxy } from '@nestjs/microservices';
 @Injectable()
 export class EventsService {
   constructor(
-    @Inject('RABBITMQ_SERVICE') private readonly client: ClientProxy,
+    @Inject('ORDER_SERVICE') private readonly client: ClientProxy,
   ) {}
 
   // Emitir eventos (no espera respuesta)
