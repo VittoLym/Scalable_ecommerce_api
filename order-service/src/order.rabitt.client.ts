@@ -44,31 +44,6 @@ export class OrderRabbitClient implements OnModuleInit {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async getOrderById(orderId: string): Promise<any> {
-    if (!this.isConnected) {
-      this.logger.warn('⚠️ No hay conexión con Order Service, reintentando...');
-      await this.connectWithRetry(3);
-    }
-
-    try {
-      this.logger.log(`🔍 Solicitando orden ${orderId} a Order Service`);
-      
-      const response = await lastValueFrom(
-        this.client
-          .send('order.get_by_id', { orderId })
-          .pipe(timeout(this.timeoutMs))
-      );
-
-      if (!response?.success) {
-        throw new Error(response?.error || 'Error al obtener la orden');
-      }
-
-      return response.data;
-    } catch (error) {
-      this.logger.error(`❌ Error obteniendo orden: ${error.message}`);
-      throw error;
-    }
-  }
   async onApplicationBootstrap() {
     await this.client.connect();
     this.logger.log('✅ Conectado a RabbitMQ');

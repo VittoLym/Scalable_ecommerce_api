@@ -4,6 +4,7 @@ import { PaymentModule } from './payment.module';
 import { config } from 'dotenv';
 import { MicroserviceOptions } from '@nestjs/microservices/interfaces';
 import { Transport } from '@nestjs/microservices';
+import maintest from './utils/mercadopago.utils';
 
 async function bootstrap() {
   config();

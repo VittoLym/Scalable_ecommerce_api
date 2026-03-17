@@ -46,7 +46,7 @@ export class PaymentService {
       const response = await preference.create({
         body: {
           binary_mode: true,
-          purpose: 'wallet_purchase',
+          purpose: 'onboarding_credits',
           items: [
             {
               id: dto.orderId,
@@ -58,22 +58,7 @@ export class PaymentService {
             },
           ],
           payer: {
-            name: 'Juan',
-            surname: 'Lopez',
-            email: 'user@email.com',
-            phone: {
-              area_code: '11',
-              number: '4444-4444',
-            },
-            identification: {
-              type: 'DNI',
-              number: '12345678',
-            },
-            address: {
-              street_name: 'Street',
-              street_number: '123',
-              zip_code: '5700',
-            },
+            email: 'test_user_7458615897109620776@testuser.com',
           },
           back_urls: {
             success: `${this.configService.get('API_URL')}/payment/success`,

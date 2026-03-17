@@ -1085,20 +1085,16 @@ export class OrderService {
     );
     return updatedOrder;
   }
-  @MessagePattern('order.get_by_id')
   async getOrderById(@Payload() data: { orderId: string }) {
     this.logger.log(`📨 Recibida solicitud de orden: ${data.orderId}`);
     try {
       const order = await this.findOne(data.orderId);
       return {
-        success: true,
-        data: {
-          id: order.id,
-          orderNumber: order.orderNumber,
-          userId: order.userId,
-          total: order.totalAmount,
-          status: order.status,
-        },
+        id: order.id,
+        orderNumber: order.orderNumber,
+        userId: order.userId,
+        total: order.totalAmount,
+        status: order.status,
       };
     } catch (error) {
       this.logger.error(`❌ Error obteniendo orden: ${error.message}`);

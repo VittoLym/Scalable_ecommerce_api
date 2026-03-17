@@ -343,7 +343,7 @@ export class OrderController {
   @MessagePattern('order.get_by_id')
   async getOrderById(@Payload() data: { orderId: string }) {
     try {
-      const order = await this.orderService.findOne(data.orderId);
+      const order = await this.orderService.getOrderById(data);
       return {
         success: true,
         data: order,
