@@ -20,6 +20,11 @@ export class PaymentController {
 
   constructor(private readonly paymentService: PaymentService) {}
 
+  @Get()
+  getHola() {
+    this.logger.log('mandarina con pollo');
+    return 'hola chirimbola';
+  }
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createPayment(@Body() createPaymentDto: CreatePaymentDto) {
@@ -54,7 +59,7 @@ export class PaymentController {
 
     return {
       success: true,
-      message: 'Pago procesado exitosamente',
+      message: updatedOrder.message ? updatedOrder.message : 'Pago procesado exitosamente' ,
       data: {
         orderId: externalReference,
         paymentId,

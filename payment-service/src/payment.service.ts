@@ -100,18 +100,15 @@ export class PaymentService {
     this.logger.log(`💰 Procesando pago exitoso: ${data.paymentId}`);
 
     try {
-      // Actualizar el estado de la orden vía RabbitMQ
       const updatedOrder = await this.orderRabbitClient.updateOrderPaymentStatus(
         data.orderId,
         {
           paymentId: data.paymentId,
           paymentStatus: 'PAID',
           paymentDate: new Date(),
-        }
-      );
+        });
 
       this.logger.log(`✅ Orden ${data.orderId} actualizada con pago exitoso`);
-      
       return updatedOrder;
     } catch (error) {
       this.logger.error(`❌ Error actualizando orden: ${error.message}`);

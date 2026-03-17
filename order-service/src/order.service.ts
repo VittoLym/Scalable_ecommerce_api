@@ -1037,7 +1037,9 @@ export class OrderService {
     });
 
     if (hasExistingPayment) {
-      throw new BadRequestException('La orden ya tiene un pago confirmado');
+      this.logger.log('⏭️ Pago Realizado - ignorando');
+      const data = { order, message: '⏭️ Pago Realizado - ignorando' };
+      return data;
     }
     const updatedOrder = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
