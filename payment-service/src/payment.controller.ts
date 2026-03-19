@@ -9,6 +9,7 @@ import {
   Logger,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './payments/dto/create-payment.dto';
@@ -28,13 +29,25 @@ export class PaymentController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createPayment(@Body() createPaymentDto: CreatePaymentDto) {
-    this.logger.log('💳 Creando nuevo pago');
-    const result = await this.paymentService.createPayment(createPaymentDto);
-    return {
-      success: true,
-      message: 'Preferencia de pago creada',
-      data: result,
-    };
+    try {
+      this.logger.log('💳 Creando nuevo pago');
+      const result = await this.paymentService.createPayment(createPaymentDto);
+      return {
+        success: true,
+        message: 'Preferencia de pago creada',
+        data: result,
+      };
+    } catch (e) {
+      if (e instanceof NotFoundException) {
+        if (e.message === 'Order Status is CONFIRMED') {
+          return {
+            success: false,
+            message: e.message,
+          };
+        }
+      }
+      this.logger.log(e);
+    }
   }
 
   @Get('success')

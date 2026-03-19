@@ -1037,8 +1037,11 @@ export class OrderService {
     });
 
     if (hasExistingPayment) {
-      this.logger.log('⏭️ Pago Realizado - ignorando');
-      const data = { order, message: '⏭️ Pago Realizado - ignorando' };
+      this.logger.log('⏭️ Pago Realizado con Anterioidad - ignorando');
+      const data = {
+        order,
+        message: '⏭️ Pago Realizado con Anterioidad - ignorando',
+      };
       return data;
     }
     const updatedOrder = await this.prisma.$transaction(async (tx) => {

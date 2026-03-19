@@ -42,6 +42,9 @@ export class PaymentService {
       this.logger.log(
         `📦 Orden encontrada: ${order.orderNumber} - Total: $${order.total}`,
       );
+      if (order.status === 'CONFIRMED') {
+        throw new NotFoundException(`Order Status is ${order.status}`);
+      }
       const preference = new Preference(this.client);
       const response = await preference.create({
         body: {
