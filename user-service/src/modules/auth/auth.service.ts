@@ -170,10 +170,25 @@ export class AuthService {
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           },
         });
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            lastLoginAt: new Date(),
+            lastLoginIp: ip,
+          },
+        });
         await tx.auditLog.create({
           data: {
             userId: user.id,
             action: 'LOGIN_SUCCESS',
+            ipAddress: ip,
+            userAgent,
+          },
+        });
+        await tx.userAuditLog.create({
+          data: {
+            userId: user.id,
+            action: 'LOGIN',
             ipAddress: ip,
             userAgent,
           },
@@ -288,12 +303,18 @@ export class AuthService {
       where: { id: user.id },
       data: {
         emailVerified: true,
+        emailVerifiedAt: new Date(),
         verificationToken: null,
         verificationExpiresAt: null,
         status: 'ACTIVE',
       },
     });
-
+    await this.prisma.userAuditLog.create({
+      data: {
+        userId: user.id,
+        action: 'VERIFY EMAIL',
+      },
+    });
     return { message: 'Email verified successfully' };
   }
   async logout(refreshToken: string) {

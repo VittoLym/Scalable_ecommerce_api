@@ -1,6 +1,7 @@
 import {
   Get,
   Body,
+  Query,
   Controller,
   Post,
   HttpCode,
@@ -17,6 +18,15 @@ export class AuthController {
       message: 'Auth is Done',
     };
   }
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string) {
+    return proxyRequest(
+      'GET',
+      `${process.env.USER_SERVICE_URL}/auth/verify-email?token=${encodeURIComponent(token)}`,
+      null,
+      {},
+    );
+  }
   @Post('login')
   login(@Body() body) {
     return proxyRequest(
@@ -26,9 +36,9 @@ export class AuthController {
       {},
     );
   }
-
   @Post('register')
   register(@Body() body) {
+    console.log('Register By Gateway');
     return proxyRequest(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/register`,
@@ -36,9 +46,9 @@ export class AuthController {
       {},
     );
   }
-
   @Post('refresh')
   refresh(@Body() body) {
+    console.log('Login By Gateway');
     return proxyRequest(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/refresh`,
@@ -46,7 +56,6 @@ export class AuthController {
       {},
     );
   }
-
   @Post('logout')
   logout(@Body() body) {
     return proxyRequest(

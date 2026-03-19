@@ -3,6 +3,7 @@
 /node_modules
 /build
 
+ngrok.exe
 # Logs
 logs
 *.log

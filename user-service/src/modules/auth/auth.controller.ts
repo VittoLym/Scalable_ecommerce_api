@@ -74,17 +74,56 @@ export class AuthController {
           error: error.message,
         });
       }
-
-      if (error!.message == 'Credenciales inválidas') {
-        throw new HttpException(
-          error.message || 'Credenciales inválidas',
-          HttpStatus.UNAUTHORIZED,
-        );
+      if (error.message) {
+        if (
+          error.message.includes('validation')||
+          error.message.includes('formato')
+        ) {
+          throw new HttpException(
+            {
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: error.message,
+              error: 'Bad Request',
+            },
+            HttpStatus.BAD_REQUEST,
+          );
+        } else if (
+          error.message.includes('credenciales') || 
+          error.message.includes('password') ||
+          error.message.includes('contraseña') ||
+          error.message.includes('email')
+        ) {
+          throw new HttpException(
+            {
+              statusCode: HttpStatus.UNAUTHORIZED,
+              message: error.message || 'Credenciales inválidas',
+              error: 'Unauthorized',
+            },
+            HttpStatus.UNAUTHORIZED,
+          );
+        } else if (
+          error.message.includes('not found') ||
+          error.message.includes('no encontrado')
+        ) {
+          throw new HttpException(
+            {
+              statusCode: HttpStatus.NOT_FOUND,
+              message: error.message,
+              error: 'Not Found',
+            },
+            HttpStatus.NOT_FOUND,
+          );
+        } else {
+          throw new HttpException(
+            {
+              statusCode: HttpStatus.UNAUTHORIZED,
+              message: error.message || 'Credenciales inválidas',
+              error: 'Unauthorized',
+            },
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
       }
-      throw new HttpException(
-        'Error en el servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
     }
   }
   @Post('register')

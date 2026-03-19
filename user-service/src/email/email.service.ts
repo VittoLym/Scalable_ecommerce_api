@@ -14,8 +14,9 @@ export class EmailService {
   ) {}
 
   async sendVerificationEmail(email: string, token: string, name?: string) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const verificationLink = `${frontendUrl}/verify-email?token=${token}`;
+    const frontendUrl =
+      process.env.FRONTEND_URL_PROD || 'http://localhost:3000';
+    const verificationLink = `${frontendUrl}/auth/verify-email?token=${token}`;
     const iwi =
       process.env.NODE_ENV === 'production'
         ? join(__dirname, 'templates')
