@@ -1,9 +1,26 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guard/jwt-auth.guard';
 import { proxyRequest } from '../../common/interceptor/proxy.interceptor';
 
 @Controller('orders')
 export class OrdersController {
+  @Get('health')
+  @HttpCode(HttpStatus.OK)
+  healthStatus(): object {
+    return {
+      message: 'hola',
+      status: 'Orders is Done',
+    };
+  }
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Req() req, @Body() body) {

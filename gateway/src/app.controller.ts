@@ -1,4 +1,11 @@
-import { Controller, Get, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Req,
+  Res,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { AppService } from './app.service';
 import type { Request, Response } from 'express';
 
@@ -10,15 +17,12 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
-  @All('api/orders/*')
-  async proxyOrders(@Req() req: Request, @Res() res: Response) {
-    const path = req.path.replace('/api/orders/', '');
-    const result = await this.proxyService.forwardRequest(
-      'order',
-      path,
-      req.method,
-      req.body,
-    );
-    res.json(result);
+  @Get('health')
+  @HttpCode(HttpStatus.OK)
+  healthStatus(): object {
+    return {
+      message: 'hola',
+      status: 'mandarina con pollo',
+    };
   }
 }
