@@ -1,13 +1,16 @@
 import {
   Get,
   Body,
+  Req,
   Query,
   Controller,
   Post,
   HttpCode,
   HttpStatus,
+  HttpException,
 } from '@nestjs/common';
 import { proxyRequest } from '../../common/interceptor/proxy.interceptor';
+import type { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -64,5 +67,73 @@ export class AuthController {
       body,
       {},
     );
+  }
+  // 🔑 FORGOT PASSWORD
+  @Post('forgot-password')
+  forgotPassword(@Body() body) {
+    try {
+      const response = proxyRequest(
+        'POST',
+        `${process.env.USER_SERVICE_URL}/auth/forgot-password`,
+        body,
+        {},
+      );
+      return response;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 🔄 RESET PASSWORD
+  @Post('reset-password')
+  resetPassword(@Body() body, @Req() req: Request) {
+    try {
+      const response = proxyRequest(
+        'POST',
+        `${process.env.USER_SERVICE_URL}/auth/reset-password`,
+        body,
+        {
+          headers: {
+            'x-forwarded-for': req.ip,
+            'user-agent': req.headers['user-agent'],
+          },
+        },
+      );
+
+      return response;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 🌐 INFO
+  @Get('info')
+  info(@Body() body, @Req() req: Request) {
+    try {
+      const response = proxyRequest(
+        'GET',
+        `${process.env.USER_SERVICE_URL}/auth/info`,
+        body,
+        {
+          headers: {
+            'x-forwarded-for': req.ip,
+            'user-agent': req.headers['user-agent'],
+          },
+        },
+      );
+
+      return response;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 🛠️ ERROR HANDLER CENTRAL
+  private handleError(error: any) {
+    if (error.response) {
+      return new HttpException(error.response.data,error.response.status);
+    }
+
+    return new HttpException('Error en API Gateway', 500);
   }
 }
