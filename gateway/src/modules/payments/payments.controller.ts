@@ -9,10 +9,11 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guard/jwt-auth.guard';
-import { proxyRequest } from '../../common/interceptor/proxy.interceptor';
+import { ProxyRequest } from '../../common/interceptor/proxy.interceptor';
 
 @Controller('payments')
 export class PaymentsController {
+  constructor(readonly proxyRequest: ProxyRequest) {}
   @Get('health')
   @HttpCode(HttpStatus.OK)
   healthStatus(): object {
@@ -24,11 +25,15 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Req() req, @Body() body) {
-    return proxyRequest(
+    return this.proxyRequest.request(
       'POST',
       `${process.env.PAYMENT_SERVICE_URL}/payments/create`,
       body,
-      { Authorization: req.headers.authorization },
+      {
+        headers: {
+          Authorization: req.headers.authorization
+        },
+      },
     );
   }
 }

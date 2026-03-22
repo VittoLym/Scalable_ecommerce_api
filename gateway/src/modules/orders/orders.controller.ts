@@ -9,10 +9,11 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guard/jwt-auth.guard';
-import { proxyRequest } from '../../common/interceptor/proxy.interceptor';
+import { ProxyRequest } from '../../common/interceptor/proxy.interceptor';
 
 @Controller('orders')
 export class OrdersController {
+  constructor(readonly proxyRequest: ProxyRequest) {}
   @Get('health')
   @HttpCode(HttpStatus.OK)
   healthStatus(): object {
@@ -24,22 +25,30 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Req() req, @Body() body) {
-    return proxyRequest(
+    return this.proxyRequest.request(
       'POST',
       `${process.env.ORDER_SERVICE_URL}/orders`,
       body,
-      { Authorization: req.headers.authorization },
+      {
+        headers: {
+          Authorization: req.headers.authorization
+        },
+      },
     );
   }
 
   @UseGuards(JwtAuthGuard)
   @Get()
   getAll(@Req() req) {
-    return proxyRequest(
+    return this.proxyRequest.request(
       'GET',
       `${process.env.ORDER_SERVICE_URL}/orders`,
       null,
-      { Authorization: req.headers.authorization },
+      {
+        headers: {
+          Authorization: req.headers.authorization
+        },
+      },
     );
   }
 }

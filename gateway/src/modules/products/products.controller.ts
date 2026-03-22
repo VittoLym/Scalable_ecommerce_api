@@ -13,17 +13,18 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { AdminGuard } from './auth/guards/admin.guard';
-import { proxyRequest } from 'src/common/interceptor/proxy.interceptor';
+import { ProxyRequest } from 'src/common/interceptor/proxy.interceptor';
 
 const PRODUCT_SERVICE =
   process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
 
 @Controller('products')
 export class ProductController {
+  constructor(readonly proxyRequest: ProxyRequest) {}
   @Get('health')
   async health(@Req() req: Request) {
     try {
-      const response = await proxyRequest(
+      const response = await this.proxyRequest.request(
         'GET',
         `${PRODUCT_SERVICE}/products/health`,
         null,
@@ -43,7 +44,7 @@ export class ProductController {
   @Post()
   async create(@Body() body, @Req() req: Request) {
     try {
-      const response = await proxyRequest(
+      const response = await this.proxyRequest.request(
         'POST',
         `${PRODUCT_SERVICE}/products`,
         body,
@@ -62,7 +63,7 @@ export class ProductController {
   @Get()
   async findAll(@Query() query, @Req() req: Request) {
     try {
-      const response = await proxyRequest(
+      const response = await this.proxyRequest.request(
         'GET',
         `${PRODUCT_SERVICE}/products`,
         null,
@@ -82,7 +83,7 @@ export class ProductController {
   @Get(':id')
   async findOne(@Param('id') id: string, @Req() req: Request) {
     try {
-      const response = await proxyRequest(
+      const response = await this.proxyRequest.request(
         'GET',
         `${PRODUCT_SERVICE}/products/${id}`,
         null,
@@ -102,7 +103,7 @@ export class ProductController {
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body, @Req() req: Request) {
     try {
-      const response = await proxyRequest(
+      const response = await this.proxyRequest.request(
         'PUT',
         `${PRODUCT_SERVICE}/products/${id}`,
         body,
@@ -122,7 +123,7 @@ export class ProductController {
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: Request) {
     try {
-      const response = await proxyRequest(
+      const response = await this.proxyRequest.request(
         'DELETE',
         `${PRODUCT_SERVICE}/products/${id}`,
         null,

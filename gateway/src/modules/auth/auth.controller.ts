@@ -9,11 +9,12 @@ import {
   HttpStatus,
   HttpException,
 } from '@nestjs/common';
-import { proxyRequest } from '../../common/interceptor/proxy.interceptor';
+import { ProxyRequest } from '../../common/interceptor/proxy.interceptor';
 import type { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
+  constructor(private readonly proxyRequest: ProxyRequest) {}
   @Get('health')
   @HttpCode(HttpStatus.OK)
   healthStatus(): object {
@@ -23,7 +24,7 @@ export class AuthController {
   }
   @Get('verify-email')
   async verifyEmail(@Query('token') token: string) {
-    return proxyRequest(
+    return this.proxyRequest.request(
       'GET',
       `${process.env.USER_SERVICE_URL}/auth/verify-email?token=${encodeURIComponent(token)}`,
       null,
@@ -32,7 +33,7 @@ export class AuthController {
   }
   @Post('login')
   async login(@Body() body) {
-    return await proxyRequest(
+    return await this.proxyRequest.request(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/login`,
       body,
@@ -42,7 +43,7 @@ export class AuthController {
   @Post('register')
   async register(@Body() body) {
     console.log('Register By Gateway');
-    return await proxyRequest(
+    return await this.proxyRequest.request(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/register`,
       body,
@@ -52,7 +53,7 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Body() body) {
     console.log('Login By Gateway');
-    return await proxyRequest(
+    return await this.proxyRequest.request(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/refresh`,
       body,
@@ -61,7 +62,7 @@ export class AuthController {
   }
   @Post('logout')
   async logout(@Body() body) {
-    return await proxyRequest(
+    return await this.proxyRequest.request(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/logout`,
       body,
@@ -72,7 +73,7 @@ export class AuthController {
   @Post('forgot-password')
   async forgotPassword(@Body() body) {
     try {
-      const response = await proxyRequest(
+      const response = await this.proxyRequest.request(
         'POST',
         `${process.env.USER_SERVICE_URL}/auth/forgot-password`,
         body,
@@ -88,7 +89,7 @@ export class AuthController {
   @Post('reset-password')
   async resetPassword(@Body() body, @Req() req: Request) {
     try {
-      const response = await proxyRequest(
+      const response = await this.proxyRequest.request(
         'POST',
         `${process.env.USER_SERVICE_URL}/auth/reset-password`,
         body,
@@ -110,7 +111,7 @@ export class AuthController {
   @Get('info')
   async info(@Body() body, @Req() req: Request) {
     try {
-      const response = await proxyRequest(
+      const response = await this.proxyRequest.request(
         'GET',
         `${process.env.USER_SERVICE_URL}/auth/info`,
         body,
