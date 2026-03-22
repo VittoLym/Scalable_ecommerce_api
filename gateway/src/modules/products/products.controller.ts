@@ -12,12 +12,8 @@ import {
   HttpException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { proxyRequest } from '../../common/interceptor/proxy.interceptor';
-import axios from 'axios';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { AdminGuard } from './auth/guards/admin.guard';
+import { proxyRequest } from 'src/common/interceptor/proxy.interceptor';
 
 const PRODUCT_SERVICE =
   process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
@@ -25,9 +21,9 @@ const PRODUCT_SERVICE =
 @Controller('products')
 export class ProductController {
   @Get('health')
-  health(@Req() req: Request) {
+  async health(@Req() req: Request) {
     try {
-      const response = proxyRequest(
+      const response = await proxyRequest(
         'GET',
         `${PRODUCT_SERVICE}/products/health`,
         null,
@@ -43,10 +39,11 @@ export class ProductController {
       throw this.handleError(error);
     }
   }
+  @UseGuards(AdminGuard)
   @Post()
-  create(@Body() body, @Req() req: Request) {
+  async create(@Body() body, @Req() req: Request) {
     try {
-      const response = proxyRequest(
+      const response = await proxyRequest(
         'POST',
         `${PRODUCT_SERVICE}/products`,
         body,
@@ -63,9 +60,9 @@ export class ProductController {
     }
   }
   @Get()
-  findAll(@Query() query, @Req() req: Request) {
+  async findAll(@Query() query, @Req() req: Request) {
     try {
-      const response = proxyRequest(
+      const response = await proxyRequest(
         'GET',
         `${PRODUCT_SERVICE}/products`,
         null,
@@ -83,9 +80,9 @@ export class ProductController {
     }
   }
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() req: Request) {
+  async findOne(@Param('id') id: string, @Req() req: Request) {
     try {
-      const response = proxyRequest(
+      const response = await proxyRequest(
         'GET',
         `${PRODUCT_SERVICE}/products/${id}`,
         null,
@@ -96,15 +93,16 @@ export class ProductController {
         },
       );
 
-      return response.data;
+      return response;
     } catch (error) {
       throw this.handleError(error);
     }
   }
+  @UseGuards(AdminGuard)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body, @Req() req: Request) {
+  async update(@Param('id') id: string, @Body() body, @Req() req: Request) {
     try {
-      const response = proxyRequest(
+      const response = await proxyRequest(
         'PUT',
         `${PRODUCT_SERVICE}/products/${id}`,
         body,
@@ -120,10 +118,11 @@ export class ProductController {
       throw this.handleError(error);
     }
   }
+  @UseGuards(AdminGuard)
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req: Request) {
+  async remove(@Param('id') id: string, @Req() req: Request) {
     try {
-      const response = proxyRequest(
+      const response = await proxyRequest(
         'DELETE',
         `${PRODUCT_SERVICE}/products/${id}`,
         null,
@@ -141,9 +140,8 @@ export class ProductController {
   }
   private handleError(error: any) {
     if (error.response) {
-      return new HttpException(error.response.data,error.response.status);
+      return new HttpException(error.response.data, error.response.status);
     }
-
     return new HttpException('Error en API Gateway', 500);
   }
 }

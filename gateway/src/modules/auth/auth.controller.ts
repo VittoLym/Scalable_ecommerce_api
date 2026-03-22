@@ -31,8 +31,8 @@ export class AuthController {
     );
   }
   @Post('login')
-  login(@Body() body) {
-    return proxyRequest(
+  async login(@Body() body) {
+    return await proxyRequest(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/login`,
       body,
@@ -40,9 +40,9 @@ export class AuthController {
     );
   }
   @Post('register')
-  register(@Body() body) {
+  async register(@Body() body) {
     console.log('Register By Gateway');
-    return proxyRequest(
+    return await proxyRequest(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/register`,
       body,
@@ -50,9 +50,9 @@ export class AuthController {
     );
   }
   @Post('refresh')
-  refresh(@Body() body) {
+  async refresh(@Body() body) {
     console.log('Login By Gateway');
-    return proxyRequest(
+    return await proxyRequest(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/refresh`,
       body,
@@ -60,8 +60,8 @@ export class AuthController {
     );
   }
   @Post('logout')
-  logout(@Body() body) {
-    return proxyRequest(
+  async logout(@Body() body) {
+    return await proxyRequest(
       'POST',
       `${process.env.USER_SERVICE_URL}/auth/logout`,
       body,
@@ -70,9 +70,9 @@ export class AuthController {
   }
   // 🔑 FORGOT PASSWORD
   @Post('forgot-password')
-  forgotPassword(@Body() body) {
+  async forgotPassword(@Body() body) {
     try {
-      const response = proxyRequest(
+      const response = await proxyRequest(
         'POST',
         `${process.env.USER_SERVICE_URL}/auth/forgot-password`,
         body,
@@ -86,9 +86,9 @@ export class AuthController {
 
   // 🔄 RESET PASSWORD
   @Post('reset-password')
-  resetPassword(@Body() body, @Req() req: Request) {
+  async resetPassword(@Body() body, @Req() req: Request) {
     try {
-      const response = proxyRequest(
+      const response = await proxyRequest(
         'POST',
         `${process.env.USER_SERVICE_URL}/auth/reset-password`,
         body,
@@ -108,9 +108,9 @@ export class AuthController {
 
   // 🌐 INFO
   @Get('info')
-  info(@Body() body, @Req() req: Request) {
+  async info(@Body() body, @Req() req: Request) {
     try {
-      const response = proxyRequest(
+      const response = await proxyRequest(
         'GET',
         `${process.env.USER_SERVICE_URL}/auth/info`,
         body,
