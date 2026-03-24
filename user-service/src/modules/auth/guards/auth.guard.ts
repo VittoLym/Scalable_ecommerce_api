@@ -18,22 +18,18 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // ✅ Verificar si es una ruta pública usando LA MISMA CLAVE
-    const isPublic = this.reflector.get<boolean>(
-      IS_PUBLIC_KEY, // Usar la constante importada
-      context.getHandler(),
-    );
+    const isPublic =
+      this.reflector.get<boolean>(
+        IS_PUBLIC_KEY, // Usar la constante importada
+        context.getHandler(),
+      ) || false;
 
-    console.log('¿Es ruta pública?', isPublic); // Para debug
-
-    // Si es pública, permitir acceso sin verificación
+    console.log('¿Es ruta pública?', isPublic);
     if (isPublic) {
       return true;
     }
-
-    // Si no es pública, verificar JWT
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
-    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException('Token no proporcionado');
     }

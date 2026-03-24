@@ -35,6 +35,23 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
   private users = [];
+  async findByToken(auth: string) {
+    const token = auth.split(' ')[1];
+    if (auth.length < 6) {
+      console.warn('is not token', auth);
+    }
+    const user = await this.prisma.$transaction(async (tx) => {
+      const userss = await tx.userSession.findFirst({
+        where: { token },
+      });
+      return await tx.user.findFirst({
+        where: {
+          id: userss?.userId,
+        },
+      });
+    });
+    return user;
+  }
   async findByEmail(email: string) {
     const user = await this.prisma.user.findFirst({
       where: {

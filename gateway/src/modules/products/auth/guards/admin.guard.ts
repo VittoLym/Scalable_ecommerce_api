@@ -21,14 +21,12 @@ export class AdminGuard implements CanActivate {
     }
 
     try {
-      // ✅ Validar token vía HTTP, no RabbitMQ
       const response = await axios.post(
         `${this.userServiceUrl}/auth/validate`,
         {},
         { headers: { authorization: `Bearer ${token}` } },
       );
-
-      const user = response.data.user;
+      const user = response.data.data;
       if (user.role !== 'ADMIN') {
         throw new ForbiddenException('Se requiere rol de administrador');
       }

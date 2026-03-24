@@ -54,7 +54,6 @@ export class ProductController {
           },
         },
       );
-
       return response;
     } catch (error) {
       throw this.handleError(error);

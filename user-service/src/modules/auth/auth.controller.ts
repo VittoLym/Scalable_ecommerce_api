@@ -264,7 +264,16 @@ export class AuthController {
       },
     };
   }
+  @Post('validate')
+  @Public()
+  async validate(@Req() req: Request) {
+    const user = await this.authService.findByToken(
+      req.headers.authorization || '',
+    );
+    return user;
+  }
   @MessagePattern('validate_token')
+  @Public()
   async validateToken(@Payload() data: { token: string }) {
     try {
       const decoded = this.jwtService.verify(data.token);
