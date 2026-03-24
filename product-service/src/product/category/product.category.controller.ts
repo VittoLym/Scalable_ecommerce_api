@@ -13,7 +13,7 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 import { CategoryService } from './product.category.service';
 import { CreateCategoryDto } from './dtos/create-category.dto';

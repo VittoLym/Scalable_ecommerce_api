@@ -1,6 +1,11 @@
 // user-service/src/rabbit/rabbit.controller.ts
 import { Controller, Logger, UseInterceptors } from '@nestjs/common';
-import { MessagePattern, Payload, Ctx, RmqContext } from '@nestjs/microservices';
+import {
+  MessagePattern,
+  Payload,
+  Ctx,
+  RmqContext,
+} from '@nestjs/microservices';
 import { UserService } from '../user/user.service';
 
 @Controller()
@@ -158,6 +163,7 @@ export class RabbitController {
         this.logger.log(
           `✅ Token decodificado - UserID: ${userId}, Role: ${payload.role}`
         );
+        console.log(payload);
       }
       const user = await this.userService.findById(userId);
       if (!user) {
