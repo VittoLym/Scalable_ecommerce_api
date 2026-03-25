@@ -54,6 +54,10 @@ export class OrderService {
     const discountAmount = createOrderDto.discountAmount || 0;
     const totalAmount = subtotal + taxAmount + shippingAmount - discountAmount;
     const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const productInventory = await this.checkInventory(
+      orderNumber,
+      createOrderDto.items,
+    );
     const order = await this.prisma.order.create({
       data: {
         orderNumber,
@@ -78,17 +82,20 @@ export class OrderService {
         contactPhone: createOrderDto.contactPhone,
         status: OrderStatus.PENDING,
         items: {
-          create: createOrderDto.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: item.unitPrice * item.quantity,
-            productSnapshot: item.productSnapshot || {
-              productId: item.productId,
-              name: item.productName || 'Producto',
-              price: item.unitPrice,
-            },
-          })),
+          create: productInventory.map((item) => {
+            if (item.tAStock != true) return;
+            return {
+              productId: item.id,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              productSnapshot: item.productSnapshot || {
+                productId: item.productId,
+                name: item.productName || 'Producto',
+                price: item.unitPrice,
+              },
+            };
+          }),
         },
         statusHistory: {
           create: {
@@ -114,6 +121,8 @@ export class OrderService {
     return allOrder;
   }
   private async emitOrderCreated(order: any) {
+    this.logger.log(`📢 Sending inventory.check event for order ${order.id}`);
+    const productInventory = await this.checkInventory(order.id, order.items);
     const eventData = {
       orderId: order.id,
       orderNumber: order.orderNumber,
@@ -124,28 +133,26 @@ export class OrderService {
       taxAmount: order.taxAmount,
       shippingAmount: order.shippingAmount,
       discountAmount: order.discountAmount,
-      items: order.items.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        productSnapshot: item.productSnapshot,
-      })),
+      items: productInventory.map((item) => {
+        if (item.tAStock != true) return;
+        return {
+          name: item.name,
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          productSnapshot: item.productSnapshot,
+        };
+      }),
       shippingAddress: order.shippingAddress,
       createdAt: order.createdAt,
     };
-    this.logger.log(`📢 Sending inventory.check event for order ${order.id}`);
-    const dte = await this.checkInventory(order.id, order.items);
     this.logger.log(`📢 Emitting order.created event for order ${order.id}`);
     const orderCreated = await this.eventsService.emitEvent(
       'order.created',
       eventData,
     );
-    const orderAll = {
-      orderCreated,
-      dte,
-    };
-    return orderAll;
+    return orderCreated;
   }
   private async checkInventory(orderId: string, items: any[]) {
     try {
@@ -1057,7 +1064,6 @@ export class OrderService {
       throw new NotFoundException(`Orden con ID ${orderId} no encontrada`);
     }
     const hasExistingPayment = order.payments?.some((payment) => {
-      console.log('Payment status:', payment.status);
       return payment.status === 'PAID';
     });
 

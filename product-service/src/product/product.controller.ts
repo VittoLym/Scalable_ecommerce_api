@@ -128,7 +128,7 @@ export class ProductController {
     return this.service.remove(id);
   }
   @MessagePattern('inventory.check')
-  checkInventory(
+  async checkInventory(
     @Payload()
     data: {
       orderId: string;
@@ -137,7 +137,9 @@ export class ProductController {
   ) {
     try {
       this.logger.log(`📦 Verificando stock para orden: ${data.orderId}`);
-      return 'mandarina con pollo';
+      const productsWithStock = await this.service.verifyStock(data);
+      if (productsWithStock === null) return 'mandarina con pollo';
+      return productsWithStock;
     } catch (error) {
       this.logger.error(`❌ Error verificando stock: ${error.message}`);
       return {

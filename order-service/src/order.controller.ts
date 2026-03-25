@@ -342,7 +342,6 @@ export class OrderController {
   }
   @MessagePattern('order.get_by_id')
   async getOrderById(@Payload() data: { orderId: string }) {
-    this.logger.log('mandarina with chiken');
     try {
       const order = await this.orderService.getOrderById(data);
       return {

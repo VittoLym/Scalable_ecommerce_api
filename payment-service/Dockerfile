@@ -8,13 +8,10 @@ WORKDIR /app
 
 # Copiar package files
 COPY package*.json ./
-COPY prisma ./prisma/
 
 # Instalar TODAS las dependencias (incluyendo dev)
 RUN npm install
 
-# Generar Prisma client
-RUN npx prisma generate
 
 # Copiar el resto del código
 COPY . .
@@ -40,9 +37,6 @@ COPY --from=builder /app/node_modules ./node_modules
 
 # Copiar el build
 COPY --from=builder /app/dist ./dist
-
-# Copiar prisma (para migraciones)
-COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3004
 

@@ -261,4 +261,35 @@ export class ProductService {
       averagePrice: averagePrice._avg.price || 0,
     };
   }
+  async verifyStock(orders: {
+    orderId: string;
+    items: { productId: string; quantity: number }[];
+  }) {
+    const products = await Promise.all(
+      orders.items.map(async (i) => {
+        const product = await this.prisma.product.findFirst({
+          where: { id: i.productId },
+        });
+        if (product === null) {
+          throw new Error('No hay producto disponible');
+        }
+        if (product?.stock != undefined && product?.stock < i.quantity)
+          return {
+            id: product.id,
+            name: product.name,
+            tAStock: false,
+          };
+        return {
+          id: product.id,
+          name: product.name,
+          tAStock: true,
+          quantity: i.quantity,
+          unitPrice: product.price,
+          totalPrice: Number(product.price) * Number(i.quantity),
+          productSnapshot: {},
+        };
+      }),
+    );
+    return products;
+  }
 }

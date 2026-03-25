@@ -1,11 +1,9 @@
-// payment.controller.ts
 import {
   Controller,
   Post,
   Get,
   Body,
   Query,
-  Param,
   Logger,
   HttpCode,
   HttpStatus,
@@ -14,7 +12,12 @@ import {
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './payments/dto/create-payment.dto';
 import { Public } from './decorator/public.decorator';
-import { Ctx, EventPattern, Payload, MessagePattern } from '@nestjs/microservices';
+import {
+  Ctx,
+  EventPattern,
+  Payload,
+  MessagePattern,
+} from '@nestjs/microservices';
 
 @Controller('payment')
 export class PaymentController {
@@ -143,12 +146,15 @@ export class PaymentController {
   @MessagePattern('order.created')
   async handleOrderCreated(pattern: string, @Payload() data: any) {
     this.logger.log('🔥🔥🔥 EVENTO RECIBIDO 🔥🔥🔥');
-    this.logger.log(`📦 Datos: ${JSON.stringify(data, null, 2)}`);
     try {
+      const productList = data.items.map((item) =>
+            `  • ${item.quantity}x ${item.name || item.productId}`)
+        .join('\n');
+      const description = `Pago de orden #${data.orderNumber}\nProductos:\n${productList}`;
       const createPaymentDto: CreatePaymentDto = {
         amount: data.totalAmount,
         orderId: data.orderId,
-        description: `Pago de orden #${data.orderNumber}`,
+        description,
       };
       const result = await this.paymentService.createPayment(createPaymentDto);
       this.logger.log(`✅ Pago creado para orden ${data.orderId}`);
