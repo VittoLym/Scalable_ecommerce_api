@@ -142,7 +142,6 @@ export class PaymentController {
   }
   @MessagePattern('order.created')
   async handleOrderCreated(pattern: string, @Payload() data: any) {
-    this.logger.log(pattern);
     this.logger.log('🔥🔥🔥 EVENTO RECIBIDO 🔥🔥🔥');
     this.logger.log(`📦 Datos: ${JSON.stringify(data, null, 2)}`);
     try {

@@ -36,6 +36,7 @@ enum FulfillmentStatus {
 model Order {
   id                String          @id @default(uuid())
   orderNumber       String          @unique // Número legible para el cliente, puede tener un formato específico
+  idempotencyKey    String          @unique
   userId            String // ID del usuario en user-service
   userEmail         String? // Desnormalización útil para consultas rápidas sin llamar a user-service
   status            OrderStatus     @default(PENDING)

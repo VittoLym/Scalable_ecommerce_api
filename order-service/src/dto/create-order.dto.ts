@@ -114,4 +114,6 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+  @IsString()
+  idempotencyKey: string;
 }

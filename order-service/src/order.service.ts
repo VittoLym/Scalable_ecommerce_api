@@ -32,6 +32,18 @@ export class OrderService {
     private eventsService: EventsService,
   ) {}
   async create(createOrderDto: CreateOrderDto) {
+    const existingOrder = await this.prisma.order.findUnique({
+      where: { idempotencyKey: createOrderDto.idempotencyKey },
+    });
+
+    if (existingOrder) {
+      this.logger.warn('⚠️ Idempotency hit - returning existing order');
+      const message = {
+        message: 'There is a order payed now',
+        existingOrder,
+      };
+      return message;
+    }
     this.logger.log(`📝 Creating order for user: ${createOrderDto.userId}`);
     const subtotal = createOrderDto.items.reduce(
       (sum, item) => sum + item.unitPrice * item.quantity,
@@ -47,6 +59,7 @@ export class OrderService {
         orderNumber,
         userId: createOrderDto.userId,
         userEmail: createOrderDto.userEmail,
+        idempotencyKey: createOrderDto.idempotencyKey,
         // Totales
         subtotal,
         taxAmount,
