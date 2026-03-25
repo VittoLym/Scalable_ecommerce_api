@@ -1,4 +1,3 @@
-// user-service/src/rabbit/rabbit.controller.ts
 import { Controller, Logger, UseInterceptors } from '@nestjs/common';
 import {
   MessagePattern,
@@ -13,6 +12,52 @@ export class RabbitController {
   private readonly logger = new Logger(RabbitController.name);
 
   constructor(private readonly userService: UserService) {}
+  @MessagePattern('user.validate')
+  async validateUser(@Payload() data: { userId: string }) {
+    this.logger.log(`✅ [user.validate] Validando usuario`);
+    try {
+      let userId = data.userId;
+      // Verificar si es un JWT (tiene 3 partes separadas por puntos)
+      if (data.userId && data.userId.split('.').length === 3) {
+        this.logger.log('🔑 Token JWT detectado, decodificando...');
+        // Decodificar JWT (extraer el payload)
+        const base64Payload = data.userId.split('.')[1];
+        // Reemplazar caracteres de base64url a base64
+        const base64 = base64Payload.replace(/-/g, '+').replace(/_/g, '/');
+        const payloadJson = Buffer.from(base64, 'base64').toString();
+        const payload = JSON.parse(payloadJson);
+        // Extraer el sub (subject) que es el userId
+        userId = payload.sub;
+        this.logger.log(
+          `✅ Token decodificado - UserID: ${userId}, Role: ${payload.role}`
+        );
+        console.log(payload);
+      }
+      const user = await this.userService.findById(userId);
+      if (!user) {
+        this.logger.warn(`⚠️ Usuario no encontrado: ${userId}`);
+        return {
+          success: false,
+          error: 'Usuario no encontrado',
+        };
+      }
+      return {
+        success: true,
+        data: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          name: user.profile?.fullName || user.email,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`❌ Error validando usuario: ${error.message}`);
+      return {
+        success: false,
+        error: 'Error interno en user-service',
+      };
+    }
+  }
   @MessagePattern('ping')
   handlePing(@Payload() data: any) {
     this.logger.log('📡 Ping recibido desde:', data?.from || 'desconocido');
@@ -144,53 +189,6 @@ export class RabbitController {
       };
     }
   }
-  @MessagePattern('user.validate')
-  async validateUser(@Payload() data: { userId: string }) {
-    this.logger.log(`✅ [user.validate] Validando usuario`);
-    try {
-      let userId = data.userId;
-      // Verificar si es un JWT (tiene 3 partes separadas por puntos)
-      if (data.userId && data.userId.split('.').length === 3) {
-        this.logger.log('🔑 Token JWT detectado, decodificando...');
-        // Decodificar JWT (extraer el payload)
-        const base64Payload = data.userId.split('.')[1];
-        // Reemplazar caracteres de base64url a base64
-        const base64 = base64Payload.replace(/-/g, '+').replace(/_/g, '/');
-        const payloadJson = Buffer.from(base64, 'base64').toString();
-        const payload = JSON.parse(payloadJson);
-        // Extraer el sub (subject) que es el userId
-        userId = payload.sub;
-        this.logger.log(
-          `✅ Token decodificado - UserID: ${userId}, Role: ${payload.role}`
-        );
-        console.log(payload);
-      }
-      const user = await this.userService.findById(userId);
-      if (!user) {
-        this.logger.warn(`⚠️ Usuario no encontrado: ${userId}`);
-        return {
-          success: false,
-          error: 'Usuario no encontrado',
-        };
-      }
-      return {
-        success: true,
-        data: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          name: user.profile?.fullName || user.email,
-        },
-      };
-    } catch (error) {
-      this.logger.error(`❌ Error validando usuario: ${error.message}`);
-      return {
-        success: false,
-        error: 'Error interno en user-service',
-      };
-    }
-  }
-
   /**
    * Obtener permisos de usuario
    */

@@ -10,18 +10,11 @@ async function bootstrap() {
     transport: Transport.RMQ,
     options: {
       urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-      queue: 'payment_events', // Cola para eventos
-      queueOptions: { durable: true },
-    },
-  });
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
-      queue: 'product_service_queue',
+      queue: 'product_rpc_queue', // Cola para eventos
       queueOptions: {
-        durable: false,
+        durable: true,
       },
+      noAck: true,
     },
   });
   app.useGlobalPipes(

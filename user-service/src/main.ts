@@ -9,28 +9,15 @@ import { Logger } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(UserModule);
   app.use(cookieParser());
-  const rabbitmqHost =
-    process.env.NODE_ENV === 'production' ? 'rabbitmq' : 'localhost';
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: [process.env.RABBITMQ_URL || 'amqp://localhost'],
-      queue: 'order_service_queue',
-      queueOptions: {
-        durable: false,
-      },
-    },
-  });
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
       urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-      queue: 'user_requests',
+      queue: 'user_rpc_queue', // 🔥 única cola del servicio
       queueOptions: {
         durable: true,
       },
-      noAck: false,
-      persistent: true,
+      noAck: true, // 🔥 permite control (eventos + RPC)
     },
   });
   app.useGlobalFilters(new AllExceptionsFilter());

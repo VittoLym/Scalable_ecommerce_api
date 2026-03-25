@@ -47,7 +47,6 @@ export class PaymentService {
       }
       const totalAmount =
         typeof order.total === 'string' ? Number(order.total) : order.total;
-      console.log(totalAmount, dto.amount);
       const preference = new Preference(this.client);
       const response = await preference.create({
         body: {

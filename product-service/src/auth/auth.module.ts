@@ -15,6 +15,7 @@ import { AdminGuard } from './guards/admin.guard';
           queue: 'user_requests',
           queueOptions: {
             durable: true,
+            noAck: false,
           },
         },
       },

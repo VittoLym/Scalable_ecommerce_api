@@ -7,18 +7,22 @@ import { Logger } from '@nestjs/common';
 export class EventsService {
   private readonly logger = new Logger(EventsService.name);
 
-  constructor(@Inject('EVENT_BUS') private readonly client: ClientProxy) {}
+  constructor(
+    @Inject('PRODUCT_SERVICE') private readonly clientProduct: ClientProxy,
+    @Inject('PAYMENT_SERVICE') private readonly clientPayment: ClientProxy,
+  ) {}
 
   async onModuleInit() {
-    await this.client.connect();
+    await this.clientProduct.connect();
+    await this.clientPayment.connect();
     this.logger.log('Connected to RabbitMQ');
   }
 
   async emitEvent(pattern: string, data: any) {
-    return this.client.emit(pattern, data);
+    return await this.clientPayment.send(pattern, data).toPromise();
   }
 
   async sendCommand(pattern: string, data: any) {
-    return lastValueFrom(this.client.send(pattern, data));
+    return await this.clientProduct.send(pattern, data).toPromise();
   }
 }

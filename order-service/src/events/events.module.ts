@@ -9,25 +9,27 @@ import { OrderModule } from 'src/order.module';
     forwardRef(() => OrderModule),
     ClientsModule.register([
       {
-        name: 'ORDER_SERVICE',
+        name: 'PRODUCT_SERVICE',
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'order_service_queue',
+          queue: 'product_rpc_queue',
           queueOptions: {
-            durable: false,
+            durable: true,
           },
-          persistent: true,
           noAck: true,
         },
       },
       {
-        name: 'EVENT_BUS',
+        name: 'PAYMENT_SERVICE',
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'payment_events', // 👈 MISMA COLA QUE EN PAYMENT
-          queueOptions: { durable: true },
+          queue: 'payment_rpc_queue',
+          queueOptions: {
+            durable: true,
+          },
+          noAck: true,
         },
       },
     ]),

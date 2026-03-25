@@ -16,34 +16,14 @@ import { AuthModule } from 'src/auth/auth.module';
     forwardRef(() => CategoryModule),
     ClientsModule.register([
       {
-        name: 'PRODUCT_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
-          queue: 'product_service_queue',
-          queueOptions: {
-            durable: false,
-          },
-        },
-      },
-      {
-        name: 'USER_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
-          queue: 'user_requests',
-          queueOptions: {
-            durable: true,
-          },
-        },
-      },
-      {
         name: 'EVENT_BUS',
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'payment_events', // 👈 MISMA COLA
+          queue: 'MicroService_Conection', // 👈 MISMA COLA
           queueOptions: { durable: true },
+          persistent: true,
+          noAck: false,
         },
       },
     ]),

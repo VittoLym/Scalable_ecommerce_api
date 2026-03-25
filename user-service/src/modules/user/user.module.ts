@@ -30,35 +30,14 @@ import { RabbitModule } from './user.rabit.module';
     }),
     ClientsModule.register([
       {
-        name: 'PRODUCT_SERVICE', // Para comunicarse con product-service
-        transport: Transport.RMQ,
-        options: {
-          urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
-          queue: 'product_service_queue',
-          queueOptions: {
-            durable: false,
-          },
-        },
-      },
-      {
-        name: 'USER_SERVICE',
+        name: 'EVENT_BUS',
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'user_requests',
-          queueOptions: {
-            durable: true,
-            // Configuración importante para evitar el error
-            autoDelete: false,
-            arguments: {
-              'x-queue-type': 'classic',
-            },
-          },
-          // Configuración de la cola de respuestas
-          replyQueue: 'amq.rabbitmq.reply-to', // Usar reply-to queue de RabbitMQ
+          queue: 'MicroService_Conection', // 👈 MISMA COLA
+          queueOptions: { durable: true },
           persistent: true,
-          noAck: true,
-          prefetchCount: 1, // Procesar un mensaje a la vez
+          noAck: false,
         },
       },
     ]),

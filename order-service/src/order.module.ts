@@ -19,46 +19,27 @@ import { APP_GUARD } from '@nestjs/core';
     EventsModule,
     ClientsModule.register([
       {
-        name: 'ORDER_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'order_service_queue',
-          queueOptions: {
-            durable: false,
-          },
-          persistent: true,
-          noAck: true,
-        },
-      },
-      {
         name: 'USER_SERVICE',
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'user_requests',
+          queue: 'user_rpc_queue',
           queueOptions: {
             durable: true,
-            // Configuración importante para evitar el error
-            autoDelete: false,
-            arguments: {
-              'x-queue-type': 'classic',
-            },
           },
-          // Configuración de la cola de respuestas
-          replyQueue: 'amq.rabbitmq.reply-to', // Usar reply-to queue de RabbitMQ
-          persistent: true,
           noAck: true,
-          prefetchCount: 1, // Procesar un mensaje a la vez
         },
       },
       {
-        name: 'EVENT_BUS',
+        name: 'PRODUCT_SERVICE',
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'payment_events', // 👈 MISMA COLA
-          queueOptions: { durable: true },
+          queue: 'product_rpc_queue',
+          queueOptions: {
+            durable: true,
+          },
+          noAck: true,
         },
       },
     ]),

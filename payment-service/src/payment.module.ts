@@ -12,23 +12,12 @@ import { ConfigModule } from '@nestjs/config';
     }),
     ClientsModule.register([
       {
-        name: 'EVENT_BUS',
-        transport: Transport.RMQ,
-        options: {
-          urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'payment_events', // 👈 MISMA COLA
-          queueOptions: { durable: true },
-        },
-      },
-      {
         name: 'ORDER_SERVICE',
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-          queue: 'order_service_queue',
-          queueOptions: {
-            durable: false,
-          },
+          queue: 'order_rpc_queue', // 👈 MISMA COLA
+          queueOptions: { durable: true },
           persistent: true,
           noAck: true,
         },

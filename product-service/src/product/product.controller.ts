@@ -27,7 +27,7 @@ export class ProductController {
   private readonly logger = new Logger(ProductController.name);
   constructor(
     private readonly service: ProductService,
-    @Inject('USER_SERVICE') private userClient: ClientProxy,
+    @Inject('EVENT_BUS') private userClient: ClientProxy,
     private readonly redisService: RedisService,
   ) {}
 
@@ -146,10 +146,5 @@ export class ProductController {
         error: error.message,
       };
     }
-  }
-  @EventPattern('order.created')
-  handleOrderCreated(@Payload() data: any) {
-    console.log('📦 Evento recibido - Orden creada:', data);
-    // Si el user-service necesita saber de órdenes
   }
 }

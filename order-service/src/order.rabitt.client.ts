@@ -15,7 +15,7 @@ export class OrderRabbitClient implements OnModuleInit {
   private readonly timeoutMs = 5000;
   private isConnected = false;
 
-  constructor(@Inject('ORDER_SERVICE') private readonly client: ClientProxy) {}
+  constructor(@Inject('USER_SERVICE') private readonly client: ClientProxy) {}
 
   async onModuleInit() {
     await this.connectWithRetry();
@@ -53,20 +53,13 @@ export class OrderRabbitClient implements OnModuleInit {
     try {
       this.logger.log(`🔍 Solicitando validación de usuario: ${userId}`);
       const response = await lastValueFrom(
-        this.client.send('user.validate', { userId }).pipe(
-          timeout(this.timeoutMs),
-          catchError((err) => {
-            if (err instanceof TimeoutError) {
-              return throwError(
-                () => new Error('Timeout en respuesta de user-service'),
-              );
-            }
-            return throwError(() => err);
-          }),
-        ),
+        this.client
+          .send('user.validate', { userId })
+          .pipe(timeout(this.timeoutMs)),
       );
-      if (!response || !response.data) {
-        throw new Error('Respuesta inválida de user-service');
+
+      if (!response?.success) {
+        throw new Error(response?.error || 'Error en user-service');
       }
 
       this.logger.log(`✅ Usuario validado: ${userId}`);

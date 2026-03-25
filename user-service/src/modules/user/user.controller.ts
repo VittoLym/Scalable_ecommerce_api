@@ -34,7 +34,7 @@ export class UserController {
   private readonly logger = new Logger(UserController.name);
   constructor(
     private readonly userService: UserService,
-    @Inject('PRODUCT_SERVICE') private productClient: ClientProxy, // Opcional: para comunicarse con order-service
+    @Inject('EVENT_BUS') private productClient: ClientProxy, // Opcional: para comunicarse con order-service
     private readonly redisService: RedisService,
     private readonly authService: AuthService,
   ) {}

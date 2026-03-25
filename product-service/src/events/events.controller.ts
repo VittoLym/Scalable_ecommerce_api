@@ -1,5 +1,5 @@
 import { Controller } from '@nestjs/common';
-import { EventPattern, Payload } from '@nestjs/microservices';
+import { Payload, MessagePattern, EventPattern } from '@nestjs/microservices';
 
 @Controller()
 export class EventsController {
@@ -16,9 +16,10 @@ export class EventsController {
     console.log('👤 Evento recibido - Usuario eliminado:', data);
     // Limpiar datos relacionados (wishlist, carrito, etc.)
   }
-  @EventPattern('inventory.check')
+  @MessagePattern('inventory.check')
   async handleInventoryCheck(pattern: string, @Payload() data: any) {
     console.log('👤 Evento recibido - Chequeando inventario:', data, pattern);
     // Limpiar datos relacionados (wishlist, carrito, etc.)
+    return 'okay con papas';
   }
 }

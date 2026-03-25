@@ -14,7 +14,7 @@ import {
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './payments/dto/create-payment.dto';
 import { Public } from './decorator/public.decorator';
-import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
+import { Ctx, EventPattern, Payload, MessagePattern } from '@nestjs/microservices';
 
 @Controller('payment')
 export class PaymentController {
@@ -140,9 +140,9 @@ export class PaymentController {
     this.logger.log(`🔔 Webhook recibido - Topic: ${topic}, ID: ${id}`);
     return { received: true };
   }
-  @EventPattern('order.created')
-  async handleOrderCreated(@Payload() data: any) {
-    // 👈 NO USES @Ctx() context
+  @MessagePattern('order.created')
+  async handleOrderCreated(pattern: string, @Payload() data: any) {
+    this.logger.log(pattern);
     this.logger.log('🔥🔥🔥 EVENTO RECIBIDO 🔥🔥🔥');
     this.logger.log(`📦 Datos: ${JSON.stringify(data, null, 2)}`);
     try {

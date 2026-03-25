@@ -92,9 +92,13 @@ export class OrderService {
     this.logger.log(
       `✅ Order created: ${order.id} (${order.orderNumber}) - Status: PENDING`,
     );
-    await this.emitOrderCreated(order);
+    const orderCreated = await this.emitOrderCreated(order);
 
-    return order;
+    const allOrder = {
+      order,
+      orderCreated,
+    };
+    return allOrder;
   }
   private async emitOrderCreated(order: any) {
     const eventData = {
@@ -117,10 +121,18 @@ export class OrderService {
       shippingAddress: order.shippingAddress,
       createdAt: order.createdAt,
     };
-
+    this.logger.log(`📢 Sending inventory.check event for order ${order.id}`);
+    const dte = await this.checkInventory(order.id, order.items);
     this.logger.log(`📢 Emitting order.created event for order ${order.id}`);
-    await this.eventsService.emitEvent('order.created', eventData);
-    this.checkInventory(order.id, order.items);
+    const orderCreated = await this.eventsService.emitEvent(
+      'order.created',
+      eventData,
+    );
+    const orderAll = {
+      orderCreated,
+      dte,
+    };
+    return orderAll;
   }
   private async checkInventory(orderId: string, items: any[]) {
     try {
@@ -138,6 +150,7 @@ export class OrderService {
         `Inventory check result for order ${orderId}:`,
         inventoryCheck,
       );
+      return inventoryCheck;
     } catch (error) {
       this.logger.error(
         `Failed to check inventory for order ${orderId}`,
