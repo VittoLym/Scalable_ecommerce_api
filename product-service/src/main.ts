@@ -9,6 +9,14 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
+      urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
+      queue: 'payment_events', // Cola para eventos
+      queueOptions: { durable: true },
+    },
+  });
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.RMQ,
+    options: {
       urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
       queue: 'product_service_queue',
       queueOptions: {
@@ -26,9 +34,8 @@ async function bootstrap() {
       },
     }),
   );
-
   await app.startAllMicroservices();
-  await app.listen(process.env.PORT ?? 3005);
+  await app.listen(process.env.PORT ?? 3002);
   Logger.log(`Product service running on port ${process.env.PORT}`);
 }
 bootstrap();

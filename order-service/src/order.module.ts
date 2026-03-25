@@ -52,6 +52,15 @@ import { APP_GUARD } from '@nestjs/core';
           prefetchCount: 1, // Procesar un mensaje a la vez
         },
       },
+      {
+        name: 'EVENT_BUS',
+        transport: Transport.RMQ,
+        options: {
+          urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
+          queue: 'payment_events', // 👈 MISMA COLA
+          queueOptions: { durable: true },
+        },
+      },
     ]),
   ],
   providers: [

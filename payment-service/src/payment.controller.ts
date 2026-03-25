@@ -141,26 +141,22 @@ export class PaymentController {
     return { received: true };
   }
   @EventPattern('order.created')
-  async handleOrderCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-    this.logger.log('🔥🔥🔥 EVENTO RECIBIDO EN PAYMENT SERVICE 🔥🔥🔥');
-    this.logger.log(`📦 Datos recibidos: ${JSON.stringify(data, null, 2)}`);
+  async handleOrderCreated(@Payload() data: any) {
+    // 👈 NO USES @Ctx() context
+    this.logger.log('🔥🔥🔥 EVENTO RECIBIDO 🔥🔥🔥');
+    this.logger.log(`📦 Datos: ${JSON.stringify(data, null, 2)}`);
     try {
-      channel.ack(originalMsg);
       const createPaymentDto: CreatePaymentDto = {
         amount: data.totalAmount,
         orderId: data.orderId,
         description: `Pago de orden #${data.orderNumber}`,
       };
       const result = await this.paymentService.createPayment(createPaymentDto);
-      this.logger.log(`✅ Pago creado automáticamente para orden ${data.orderId}`);
-      this.logger.log(`🔗 Checkout URL: ${result.checkoutUrl}`);
+      this.logger.log(`✅ Pago creado para orden ${data.orderId}`);
       return result;
     } catch (error) {
-      this.logger.error(`❌ Error procesando orden: ${error.message}`);
-      // No rechazar el mensaje para no reintentar
-      channel.ack(originalMsg);
+      this.logger.error(`❌ Error: ${error.message}`);
+      // No hacer ack, con noAck: true RabbitMQ ya lo confirma
       return { success: false, error: error.message };
     }
   }

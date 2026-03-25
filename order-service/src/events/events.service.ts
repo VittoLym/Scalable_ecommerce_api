@@ -15,13 +15,10 @@ export class EventsService {
   }
 
   async emitEvent(pattern: string, data: any) {
-    this.logger.log(`📤 Emitting event: ${pattern}`, data);
     return this.client.emit(pattern, data);
   }
 
   async sendCommand(pattern: string, data: any) {
-    this.logger.log(`📤 Sending command: ${pattern}`, data);
-    
     return lastValueFrom(this.client.send(pattern, data));
   }
 }

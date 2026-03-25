@@ -16,13 +16,15 @@ import { ProductService } from './product.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { FilterProductDto } from '../dto/filter-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
 import { ClientProxy } from '@nestjs/microservices';
 import { RedisService } from 'src/redis/redis.service';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { Logger } from '@nestjs/common';
 
 @Controller('products')
 export class ProductController {
+  private readonly logger = new Logger(ProductController.name);
   constructor(
     private readonly service: ProductService,
     @Inject('USER_SERVICE') private userClient: ClientProxy,
@@ -124,5 +126,30 @@ export class ProductController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+  @MessagePattern('inventory.check')
+  checkInventory(
+    @Payload()
+    data: {
+      orderId: string;
+      items: { productId: string; quantity: number }[];
+    },
+  ) {
+    try {
+      this.logger.log(`📦 Verificando stock para orden: ${data.orderId}`);
+      return 'mandarina con pollo';
+    } catch (error) {
+      this.logger.error(`❌ Error verificando stock: ${error.message}`);
+      return {
+        success: false,
+        orderId: data.orderId,
+        error: error.message,
+      };
+    }
+  }
+  @EventPattern('order.created')
+  handleOrderCreated(@Payload() data: any) {
+    console.log('📦 Evento recibido - Orden creada:', data);
+    // Si el user-service necesita saber de órdenes
   }
 }
