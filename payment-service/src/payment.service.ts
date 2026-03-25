@@ -45,6 +45,9 @@ export class PaymentService {
       if (order.status === 'CONFIRMED') {
         throw new NotFoundException(`Order Status is ${order.status}`);
       }
+      const totalAmount =
+        typeof order.total === 'string' ? Number(order.total) : order.total;
+      console.log(totalAmount, dto.amount);
       const preference = new Preference(this.client);
       const response = await preference.create({
         body: {
@@ -55,7 +58,7 @@ export class PaymentService {
               id: dto.orderId,
               title: dto.description,
               quantity: 1,
-              unit_price: dto.amount || order.total,
+              unit_price: totalAmount || dto.amount,
               currency_id: 'ARS',
               description: `Pago de orden #${order.orderNumber || dto.orderId}`,
             },
