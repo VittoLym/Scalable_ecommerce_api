@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { ProductModule } from './product/product.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { ValidationPipe } from '@nestjs/common';
@@ -28,6 +29,6 @@ async function bootstrap() {
 
   await app.startAllMicroservices();
   await app.listen(process.env.PORT ?? 3005);
-  console.log(`Product service running on port ${process.env.PORT}`);
+  Logger.log(`Product service running on port ${process.env.PORT}`);
 }
 bootstrap();

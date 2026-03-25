@@ -23,8 +23,8 @@ const CATEGORY_SERVICE_URL =
   process.env.CATEGORY_SERVICE_URL || 'http://localhost:3005';
 
 @Controller('products/category')
-export class CategoryController {
-  private readonly logger = new Logger(CategoryController.name);
+export class ProductCategoryController {
+  private readonly logger = new Logger(ProductCategoryController.name);
   constructor(readonly proxyRequest: ProxyRequest) {}
   @UseGuards(AdminGuard)
   @Post()

@@ -14,6 +14,16 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
+      urls: [process.env.RABBITMQ_URL || 'amqp://localhost'],
+      queue: 'order_service_queue',
+      queueOptions: {
+        durable: false,
+      },
+    },
+  });
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.RMQ,
+    options: {
       urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
       queue: 'user_requests',
       queueOptions: {
@@ -21,16 +31,6 @@ async function bootstrap() {
       },
       noAck: false,
       persistent: true,
-    },
-  });
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: [`amqp://${rabbitmqHost}:5672`],
-      queue: 'user_service_queue',
-      queueOptions: {
-        durable: false,
-      },
     },
   });
   app.useGlobalFilters(new AllExceptionsFilter());

@@ -65,7 +65,6 @@ export class OrderRabbitClient implements OnModuleInit {
           }),
         ),
       );
-
       if (!response || !response.data) {
         throw new Error('Respuesta inválida de user-service');
       }

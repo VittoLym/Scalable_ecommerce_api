@@ -19,7 +19,7 @@ export class OrderRabbitClient {
   private readonly logger = new Logger(OrderRabbitClient.name);
   private readonly timeoutMs = 5000; // 5 segundos de timeout
 
-  constructor(@Inject('ORDER_SERVICE') private readonly client: ClientProxy) {}
+  constructor(@Inject('EVENT_BUS') private readonly client: ClientProxy) {}
   async onApplicationBootstrap() {
     try {
       await this.client.connect();

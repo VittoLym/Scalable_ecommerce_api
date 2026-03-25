@@ -1,3 +1,4 @@
+// dto/create-order.dto.ts
 import { Type } from 'class-transformer';
 import {
   IsString,
@@ -9,11 +10,13 @@ import {
   Min,
   IsObject,
   IsUUID,
+  IsNotEmpty,
 } from 'class-validator';
 
 export class OrderItemDto {
-  @IsString()
   @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   productId: string;
 
   @IsNumber()
@@ -35,15 +38,19 @@ export class OrderItemDto {
 
 export class AddressDto {
   @IsString()
+  @IsNotEmpty()
   street: string;
 
   @IsString()
+  @IsNotEmpty()
   city: string;
 
   @IsString()
+  @IsNotEmpty()
   zipCode: string;
 
   @IsString()
+  @IsNotEmpty()
   country: string;
 
   @IsOptional()
@@ -58,6 +65,7 @@ export class AddressDto {
 export class CreateOrderDto {
   @IsUUID()
   @IsString()
+  @IsNotEmpty()
   userId: string;
 
   @IsOptional()
@@ -67,10 +75,12 @@ export class CreateOrderDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
+  @IsNotEmpty()
   items: OrderItemDto[];
 
   @ValidateNested()
   @Type(() => AddressDto)
+  @IsNotEmpty()
   shippingAddress: AddressDto;
 
   @IsOptional()

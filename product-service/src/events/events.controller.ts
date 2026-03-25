@@ -16,4 +16,9 @@ export class EventsController {
     console.log('👤 Evento recibido - Usuario eliminado:', data);
     // Limpiar datos relacionados (wishlist, carrito, etc.)
   }
+  @EventPattern('inventory.check')
+  async handleInventoryCheck(pattern: string, @Payload() data: any) {
+    console.log('👤 Evento recibido - Chequeando inventario:', data, pattern);
+    // Limpiar datos relacionados (wishlist, carrito, etc.)
+  }
 }

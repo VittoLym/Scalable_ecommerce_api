@@ -120,7 +120,6 @@ export class OrderService {
 
     this.logger.log(`📢 Emitting order.created event for order ${order.id}`);
     await this.eventsService.emitEvent('order.created', eventData);
-    // Enviar comando para verificar inventario
     this.checkInventory(order.id, order.items);
   }
   private async checkInventory(orderId: string, items: any[]) {

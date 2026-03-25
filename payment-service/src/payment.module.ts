@@ -24,6 +24,15 @@ import { ConfigModule } from '@nestjs/config';
           noAck: true,
         },
       },
+      {
+        name: 'EVENT_BUS',
+        transport: Transport.RMQ,
+        options: {
+          urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
+          queue: 'payment_events', // 👈 MISMA COLA
+          queueOptions: { durable: true },
+        },
+      },
     ]),
   ],
   controllers: [PaymentController],

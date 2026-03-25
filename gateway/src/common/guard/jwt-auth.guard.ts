@@ -8,7 +8,6 @@ export class JwtAuthGuard implements CanActivate {
 
     const auth = req.headers.authorization;
     if (!auth) return false;
-
     const token = auth.split(' ')[1];
 
     try {

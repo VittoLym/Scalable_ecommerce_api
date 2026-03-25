@@ -7,7 +7,7 @@ import { Logger } from '@nestjs/common';
 export class EventsService {
   private readonly logger = new Logger(EventsService.name);
 
-  constructor(@Inject('ORDER_SERVICE') private readonly client: ClientProxy) {}
+  constructor(@Inject('EVENT_BUS') private readonly client: ClientProxy) {}
 
   async onModuleInit() {
     await this.client.connect();
@@ -21,6 +21,7 @@ export class EventsService {
 
   async sendCommand(pattern: string, data: any) {
     this.logger.log(`📤 Sending command: ${pattern}`, data);
+    
     return lastValueFrom(this.client.send(pattern, data));
   }
 }

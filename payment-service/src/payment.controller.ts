@@ -14,6 +14,7 @@ import {
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './payments/dto/create-payment.dto';
 import { Public } from './decorator/public.decorator';
+import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 
 @Controller('payment')
 export class PaymentController {
@@ -72,7 +73,7 @@ export class PaymentController {
 
     return {
       success: true,
-      message: updatedOrder.message ? updatedOrder.message : 'Pago procesado exitosamente' ,
+      message: updatedOrder.message ? updatedOrder.message : 'Pago procesado exitosamente',
       data: {
         orderId: externalReference,
         paymentId,
@@ -138,5 +139,72 @@ export class PaymentController {
   ) {
     this.logger.log(`🔔 Webhook recibido - Topic: ${topic}, ID: ${id}`);
     return { received: true };
+  }
+  @EventPattern('order.created')
+  async handleOrderCreated(@Payload() data: any, @Ctx() context: RmqContext) {
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    this.logger.log('🔥🔥🔥 EVENTO RECIBIDO EN PAYMENT SERVICE 🔥🔥🔥');
+    this.logger.log(`📦 Datos recibidos: ${JSON.stringify(data, null, 2)}`);
+    try {
+      channel.ack(originalMsg);
+      const createPaymentDto: CreatePaymentDto = {
+        amount: data.totalAmount,
+        orderId: data.orderId,
+        description: `Pago de orden #${data.orderNumber}`,
+      };
+      const result = await this.paymentService.createPayment(createPaymentDto);
+      this.logger.log(`✅ Pago creado automáticamente para orden ${data.orderId}`);
+      this.logger.log(`🔗 Checkout URL: ${result.checkoutUrl}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`❌ Error procesando orden: ${error.message}`);
+      // No rechazar el mensaje para no reintentar
+      channel.ack(originalMsg);
+      return { success: false, error: error.message };
+    }
+  }
+  @Get('diagnostic')
+  @Public()
+  async diagnostic() {
+    this.logger.log('🔍 Diagnosticando estado del microservicio');
+    return {
+      service: 'payment-service',
+      status: 'running',
+      microservices: {
+        paymentEvents: {
+          queue: 'payment_events',
+          isConnected: this.isMicroserviceConnected(),
+        },
+        orderServiceQueue: {
+          queue: 'order_service_queue',
+          isConnected: this.isOrderServiceConnected(),
+        },
+      },
+      handlers: {
+        'order.created': 'registered',
+      },
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  private isMicroserviceConnected(): boolean {
+    // Verificar estado del microservicio
+    return true; // Implementar según tu lógica
+  }
+
+  private isOrderServiceConnected(): boolean {
+    return true; // Implementar según tu lógica
+  }
+  @Get('ping')
+  @Public()
+  async ping() {
+    this.logger.log('🏓 Pong!');
+    return {
+      pong: true,
+      service: 'payment-service',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    };
   }
 }

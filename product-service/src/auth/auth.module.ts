@@ -12,9 +12,9 @@ import { AdminGuard } from './guards/admin.guard';
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
-          queue: 'user_service_queue',
+          queue: 'user_requests',
           queueOptions: {
-            durable: false,
+            durable: true,
           },
         },
       },
