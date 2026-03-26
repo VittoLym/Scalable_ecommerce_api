@@ -215,6 +215,77 @@ services:
       - ./order-service:/app
       - /app/node_modules
 
+    # -------------------------
+  # PAYMENT DB
+  # -------------------------
+  payment-db:
+    image: postgres:15
+    container_name: payment-db-dev
+    environment:
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: payment_password
+      POSTGRES_DB: paymentdb
+    ports:
+      - "5436:5432"
+    volumes:
+      - payment_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-network
+
+  # -------------------------
+  # PAYMENT SERVICE
+  # -------------------------
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service-dev
+    ports:
+      - "3004:3004"
+    env_file:
+      - ./payment-service/.env
+    environment:
+      NODE_ENV: development
+      PGSSLMODE: disable
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      ORDER_SERVICE_URL: http://order-service:3003
+      API_URL: http://localhost:3000
+    depends_on:
+      - payment-db
+      - redis
+      - rabbitmq
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./payment-service:/app
+      - /app/node_modules
+    command: npm run start:dev
+
+  # -------------------------
+  # API GATEWAY
+  # -------------------------
+  api-gateway:
+    build: ./gateway
+    container_name: api-gateway-dev
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      USER_SERVICE_URL: http://user-service:3001
+      PRODUCT_SERVICE_URL: http://product-service:3002
+      ORDER_SERVICE_URL: http://order-service:3003
+      PAYMENT_SERVICE_URL: http://payment-service:3004
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - payment-service
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./api-gateway:/app
+      - /app/node_modules
+    command: npm run start:dev
+
 networks:
   ecommerce-network:
     driver: bridge
@@ -223,5 +294,6 @@ volumes:
   user_data:
   product_data:
   order_data:
+  payment_data:
   rabbitmq_data:
   redis_data:
