@@ -88,6 +88,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://rabbitmq:5672
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -268,6 +269,8 @@ services:
     container_name: api-gateway-dev
     ports:
       - "3000:3000"
+    env_file:
+      - ./gateway/.env
     environment:
       NODE_ENV: development
       USER_SERVICE_URL: http://user-service:3001
@@ -282,7 +285,7 @@ services:
     networks:
       - ecommerce-network
     volumes:
-      - ./api-gateway:/app
+      - ./gateway:/app
       - /app/node_modules
     command: npm run start:dev
 

@@ -14,6 +14,7 @@ import { ProxyRequest } from '../../common/interceptor/proxy.interceptor';
 @Controller('orders')
 export class OrdersController {
   constructor(readonly proxyRequest: ProxyRequest) {}
+  private order_url = process.env.ORDER_SERVICE_URL || 'http://localhost:3003';
   @Get('health')
   @HttpCode(HttpStatus.OK)
   healthStatus(): object {
@@ -25,30 +26,20 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Req() req, @Body() body) {
-    return this.proxyRequest.request(
-      'POST',
-      `${process.env.ORDER_SERVICE_URL}/orders`,
-      body,
-      {
-        headers: {
-          Authorization: req.headers.authorization
-        },
+    return this.proxyRequest.request('POST', `${this.order_url}/orders`, body, {
+      headers: {
+        Authorization: req.headers.authorization
       },
-    );
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Get()
   getAll(@Req() req) {
-    return this.proxyRequest.request(
-      'GET',
-      `${process.env.ORDER_SERVICE_URL}/orders`,
-      null,
-      {
-        headers: {
-          Authorization: req.headers.authorization
-        },
+    return this.proxyRequest.request('GET', `${this.order_url}/orders`, null, {
+      headers: {
+        Authorization: req.headers.authorization
       },
-    );
+    });
   }
 }

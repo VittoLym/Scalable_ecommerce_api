@@ -15,6 +15,7 @@ import type { Request } from 'express';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly proxyRequest: ProxyRequest) {}
+  private user_url = process.env.USER_SERVICE_URL || 'http://localhost:3001';
   @Get('health')
   @HttpCode(HttpStatus.OK)
   healthStatus(): object {
@@ -26,16 +27,17 @@ export class AuthController {
   async verifyEmail(@Query('token') token: string) {
     return this.proxyRequest.request(
       'GET',
-      `${process.env.USER_SERVICE_URL}/auth/verify-email?token=${encodeURIComponent(token)}`,
+      `${this.user_url}/auth/verify-email?token=${encodeURIComponent(token)}`,
       null,
       {},
     );
   }
   @Post('login')
   async login(@Body() body) {
+    console.log(process.env.USER_SERVICE_URL);
     return await this.proxyRequest.request(
       'POST',
-      `${process.env.USER_SERVICE_URL}/auth/login`,
+      `${this.user_url}/auth/login`,
       body,
       {},
     );
@@ -43,9 +45,11 @@ export class AuthController {
   @Post('register')
   async register(@Body() body) {
     console.log('Register By Gateway');
+    console.log(this.user_url);
+    console.log(body);
     return await this.proxyRequest.request(
       'POST',
-      `${process.env.USER_SERVICE_URL}/auth/register`,
+      `${this.user_url}/auth/register`,
       body,
       {},
     );
@@ -55,7 +59,7 @@ export class AuthController {
     console.log('Login By Gateway');
     return await this.proxyRequest.request(
       'POST',
-      `${process.env.USER_SERVICE_URL}/auth/refresh`,
+      `${this.user_url}/auth/refresh`,
       body,
       {},
     );
@@ -64,7 +68,7 @@ export class AuthController {
   async logout(@Body() body) {
     return await this.proxyRequest.request(
       'POST',
-      `${process.env.USER_SERVICE_URL}/auth/logout`,
+      `${this.user_url}/auth/logout`,
       body,
       {},
     );
@@ -75,7 +79,7 @@ export class AuthController {
     try {
       const response = await this.proxyRequest.request(
         'POST',
-        `${process.env.USER_SERVICE_URL}/auth/forgot-password`,
+        `${this.user_url}/auth/forgot-password`,
         body,
         {},
       );
@@ -91,7 +95,7 @@ export class AuthController {
     try {
       const response = await this.proxyRequest.request(
         'POST',
-        `${process.env.USER_SERVICE_URL}/auth/reset-password`,
+        `${this.user_url}/auth/reset-password`,
         body,
         {
           headers: {
@@ -113,7 +117,7 @@ export class AuthController {
     try {
       const response = await this.proxyRequest.request(
         'GET',
-        `${process.env.USER_SERVICE_URL}/auth/info`,
+        `${this.user_url}/auth/info`,
         body,
         {
           headers: {
