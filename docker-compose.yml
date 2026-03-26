@@ -249,7 +249,7 @@ services:
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://rabbitmq:5672
       ORDER_SERVICE_URL: http://order-service:3003
-      API_URL: http://localhost:3000
+      API_URL: https://nontoxic-carly-obtundent.ngrok-free.dev
     depends_on:
       - payment-db
       - redis
