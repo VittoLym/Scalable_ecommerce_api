@@ -31,6 +31,12 @@ export class PaymentService {
     });
   }
   async createPayment(dto: CreatePaymentDto) {
+    const uwu = {
+      success: `${this.configService.get('API_URL')}/payment/success`,
+      failure: `${this.configService.get('API_URL')}/payment/failure`,
+      pending: `${this.configService.get('API_URL')}/payment/pending`,
+    };
+    console.log(uwu);
     this.logger.log(
       `💳 Creando preferencia de pago para orden: ${dto.orderId}`,
     );

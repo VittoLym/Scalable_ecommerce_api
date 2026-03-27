@@ -12,6 +12,10 @@ build
 out
 
 # Cache
+node_modules
+dist
+npm-debug.log
+.git
 .cache
 .turbo
 .eslintcache

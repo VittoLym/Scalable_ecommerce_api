@@ -19,7 +19,9 @@ export class EventsService {
   }
 
   async emitEvent(pattern: string, data: any) {
-    return await this.clientPayment.send(pattern, data).toPromise();
+    console.log(pattern, data);
+    const test = await this.clientPayment.send(pattern, data).toPromise();
+    console.log(test);
   }
 
   async sendCommand(pattern: string, data: any) {
