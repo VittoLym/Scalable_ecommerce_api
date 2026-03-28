@@ -371,6 +371,7 @@ export class OrderController {
         data.orderId,
         data,
       );
+      console.log(order);
       return {
         success: true,
         data: order,
