@@ -41,11 +41,6 @@ export class OrderController {
       data: order,
     };
   }
-  @Get('tested')
-  @Public()
-  async test1() {
-    return await this.orderService.test('mandarina con pollo');
-  }
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(
@@ -344,6 +339,11 @@ export class OrderController {
       success: true,
       data: csvData,
     };
+  }
+  @Post('reserved-stock')
+  @Public()
+  async reservedStock(@Payload() data) {
+    return await this.orderService.reservedStock(data);
   }
   @MessagePattern('order.get_by_id')
   async getOrderById(@Payload() data: { orderId: string }) {

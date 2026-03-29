@@ -265,8 +265,10 @@ export class ProductService {
     orderId: string;
     items: { productId: string; quantity: number }[];
   }) {
+    console.log(orders);
     const products = await Promise.all(
       orders.items.map(async (i) => {
+        console.log(i.productId);
         const product = await this.prisma.product.findFirst({
           where: { id: i.productId },
         });
@@ -292,9 +294,42 @@ export class ProductService {
     );
     return products;
   }
-  async recervedStock(data) {
-    console.log(data);
-    await this.prisma.stockReservation.
-    return data
+  async reservedStock(data: {
+    productId: string;
+    quantity: number;
+    orderId: string;
+  }) {
+    const { productId, quantity, orderId } = data;
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const product = await tx.product.update({
+          where: { id: productId },
+          data: {
+            stock: {
+              decrement: quantity, // Resta automáticamente la cantidad
+            },
+          },
+        });
+        if (product.stock < 0) {
+          throw new Error(`Stock insuficiente para el producto: ${productId}`);
+        }
+        const reservation = await tx.stockReservation.create({
+          data: {
+            productId,
+            orderId,
+            quantity,
+            status: 'PENDING', // O el estado que manejes
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000), // Expira en 15 min
+          },
+        });
+        console.log(
+          `✅ Stock reservado: ${quantity} unidades del producto ${productId}`,
+        );
+        return reservation;
+      });
+    } catch (error) {
+      console.error('❌ Error al reservar stock:', error.message);
+      throw error; // Re-lanzamos para que el controlador o el microservicio lo maneje
+    }
   }
 }
