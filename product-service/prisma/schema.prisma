@@ -10,15 +10,49 @@ model Product {
   name        String
   description String?
   price       Float
-  stock       Int
+
+  stock       Int              // total físico
+  reserved    Int      @default(0) // 🔥 cache rápido (opcional pero recomendado)
+
   isActive    Boolean  @default(true)
+
+  categoryId  String
+  category    Category? @relation(fields: [categoryId], references: [id])
+
+  reservations StockReservation[] // 🔥 relación
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  categoryId String
 
-  category    Category? @relation(fields: [categoryId], references: [id])
   @@index([name])
   @@index([price])
+}
+
+model StockReservation {
+  id         String   @id @default(uuid())
+
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+
+  orderId    String   // 🔥 viene del order-service
+  quantity   Int
+
+  status     ReservationStatus @default(PENDING)
+
+  expiresAt  DateTime
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([productId])
+  @@index([orderId])
+  @@index([status])
+}
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  RELEASED
+  EXPIRED
 }
 model Category {
   id               String    @id @default(uuid())
