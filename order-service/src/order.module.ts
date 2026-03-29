@@ -46,8 +46,6 @@ import { APP_GUARD } from '@nestjs/core';
   ],
   providers: [
     OrderService,
-    RolesGuard,
-    AuthUserGuard,
     OrderRabbitClient,
     {
       provide: APP_GUARD,

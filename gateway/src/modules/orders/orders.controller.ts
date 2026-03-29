@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guard/jwt-auth.guard';
 import { ProxyRequest } from '../../common/interceptor/proxy.interceptor';
-
+import type { Request } from '@nestjs/common';
 @Controller('orders')
 export class OrdersController {
   constructor(readonly proxyRequest: ProxyRequest) {}
@@ -41,5 +41,16 @@ export class OrdersController {
         Authorization: req.headers.authorization
       },
     });
+  }
+  @Get('test')
+  test(@Req() data: Request) {
+    return this.proxyRequest.request(
+      'GET',
+      `${this.order_url}/orders/tested`,
+      null,
+      {
+        headers: {},
+      },
+    );
   }
 }

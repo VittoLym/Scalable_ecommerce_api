@@ -41,6 +41,11 @@ export class OrderController {
       data: order,
     };
   }
+  @Get('tested')
+  @Public()
+  async test1() {
+    return await this.orderService.test('mandarina con pollo');
+  }
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(

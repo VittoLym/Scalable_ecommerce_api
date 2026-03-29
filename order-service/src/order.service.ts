@@ -31,6 +31,11 @@ export class OrderService {
     private prisma: PrismaService,
     private eventsService: EventsService,
   ) {}
+  async test(@Payload() data) {
+    const u = await this.eventsService.sendCommand('stock.recerved', data);
+    if (u === undefined) return 'mimic';
+    return u;
+  }
   async create(createOrderDto: CreateOrderDto) {
     const existingOrder = await this.prisma.order.findUnique({
       where: { idempotencyKey: createOrderDto.idempotencyKey },
@@ -57,6 +62,10 @@ export class OrderService {
     const productInventory = await this.checkInventory(
       orderNumber,
       createOrderDto.items,
+    );
+    await this.eventsService.sendCommand(
+      'stock.recerved',
+      'mandarina con pollo',
     );
     const order = await this.prisma.order.create({
       data: {

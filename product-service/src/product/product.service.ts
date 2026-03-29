@@ -292,4 +292,9 @@ export class ProductService {
     );
     return products;
   }
+  async recervedStock(data) {
+    console.log(data);
+    await this.prisma.stockReservation.
+    return data
+  }
 }

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { OrderRabbitClient } from '../order.rabitt.client';
+import { IS_PUBLIC_KEY } from 'decorator/public.decorator';
 
 @Injectable()
 export class AuthUserGuard implements CanActivate {
@@ -19,8 +20,17 @@ export class AuthUserGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    const handler = context.getHandler();
+    const controller = context.getClass();
     // Verificar si la ruta es pública
-    const isPublic = this.reflector.get<boolean>('isPublic', context.getHandler());
+    // Esto nos dirá si EXISTE algo llamado 'isPublic' en la memoria de Refl
+    const isPublic =
+      this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+        handler,
+        controller,
+      ]) || false;
+
+    console.log('¿Es ruta pública?', isPublic);
     if (isPublic) {
       return true;
     }
@@ -28,6 +38,7 @@ export class AuthUserGuard implements CanActivate {
     try {
       // Obtener token del header
       const authHeader = request.headers.authorization;
+      console.log(authHeader);
       if (!authHeader) {
         throw new UnauthorizedException('Token no proporcionado');
       }

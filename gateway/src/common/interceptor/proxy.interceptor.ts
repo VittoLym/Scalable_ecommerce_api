@@ -38,9 +38,11 @@ export class ProxyRequest {
           console.log('  - Data:', axiosError.response.data);
         }
         if (axiosError.request) {
-          console.log('  - Request URL:', axiosError.request?.res?.responseUrl || url);
+          console.log(
+            '  - Request URL:',
+            axiosError.request?.res?.responseUrl || url,
+          );
         }
-        
         if (axiosError.code === 'ECONNREFUSED') {
           throw new HttpException(
             `Servicio no disponible en ${url}`,

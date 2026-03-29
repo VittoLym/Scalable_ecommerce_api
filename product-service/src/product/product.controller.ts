@@ -149,4 +149,8 @@ export class ProductController {
       };
     }
   }
+  @MessagePattern('stock.recerved')
+  async stockRecerved(@Payload() data) {
+    return await this.service.recervedStock(data);
+  }
 }
