@@ -265,10 +265,8 @@ export class ProductService {
     orderId: string;
     items: { productId: string; quantity: number }[];
   }) {
-    console.log(orders);
     const products = await Promise.all(
       orders.items.map(async (i) => {
-        console.log(i.productId);
         const product = await this.prisma.product.findFirst({
           where: { id: i.productId },
         });
@@ -295,41 +293,47 @@ export class ProductService {
     return products;
   }
   async reservedStock(data: {
-    productId: string;
-    quantity: number;
     orderId: string;
+    items: { productId: string; quantity: number }[];
   }) {
-    const { productId, quantity, orderId } = data;
+    const { orderId, items } = data;
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const product = await tx.product.update({
-          where: { id: productId },
-          data: {
-            stock: {
-              decrement: quantity, // Resta automáticamente la cantidad
+        const reservationPromises = items.map(async (item) => {
+          const updatedProduct = await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: {
+                decrement: item.quantity,
+              },
             },
-          },
+          });
+          if (updatedProduct.stock < 0) {
+            throw new Error(
+              `Stock insuficiente para el producto: ${item.productId}`,
+            );
+          }
+          return tx.stockReservation.create({
+            data: {
+              productId: item.productId,
+              orderId: orderId, // 👈 Usamos el ID que viene en la raíz del objeto
+              quantity: item.quantity,
+              status: 'PENDING',
+              expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+            },
+          });
         });
-        if (product.stock < 0) {
-          throw new Error(`Stock insuficiente para el producto: ${productId}`);
-        }
-        const reservation = await tx.stockReservation.create({
-          data: {
-            productId,
-            orderId,
-            quantity,
-            status: 'PENDING', // O el estado que manejes
-            expiresAt: new Date(Date.now() + 15 * 60 * 1000), // Expira en 15 min
-          },
-        });
-        console.log(
-          `✅ Stock reservado: ${quantity} unidades del producto ${productId}`,
+        const results = await Promise.all(reservationPromises);
+        this.logger.log(
+          `✅ ${results.length} productos reservados para la orden ${orderId}`,
         );
-        return reservation;
+        return results;
       });
     } catch (error) {
-      console.error('❌ Error al reservar stock:', error.message);
-      throw error; // Re-lanzamos para que el controlador o el microservicio lo maneje
+      this.logger.error(
+        `❌ Error en reserva masiva para orden ${orderId}: ${error.message}`
+      );
+      throw error;
     }
   }
 }

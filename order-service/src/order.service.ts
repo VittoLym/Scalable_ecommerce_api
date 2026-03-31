@@ -115,14 +115,16 @@ export class OrderService {
     this.logger.log(
       `✅ Order created: ${order.id} (${order.orderNumber}) - Status: PENDING`,
     );
-    const data = createOrderDto.items.map((i) => {
-      return {
-        productId: i.productId,
-        quantity: i.quantity,
-        orderId: order.id,
-      };
-    });
-    await this.eventsService.sendCommand('stock.recerved', data);
+    const data = {
+      orderId: order.id,
+      items: createOrderDto.items.map((i) => {
+        return {
+          productId: i.productId,
+          quantity: i.quantity,
+        };
+      }),
+    };
+    await this.eventsService.sendCommand('stock.reserved', data);
     const orderCreated = await this.emitOrderCreated(order);
 
     const allOrder = {
