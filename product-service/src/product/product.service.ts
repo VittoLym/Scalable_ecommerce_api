@@ -273,6 +273,9 @@ export class ProductService {
         if (product === null) {
           throw new Error('No hay producto disponible');
         }
+        if (product.reserved > i.quantity) {
+          throw new Error('No se pueden reservar estos productos');
+        }
         if (product?.stock != undefined && product?.stock < i.quantity)
           return {
             id: product.id,

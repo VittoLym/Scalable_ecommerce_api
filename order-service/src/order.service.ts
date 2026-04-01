@@ -52,7 +52,7 @@ export class OrderService {
       (sum, item) => sum + item.unitPrice * item.quantity,
       0,
     );
-    const taxAmount = createOrderDto.taxAmount || subtotal * 0.21; // 21% IVA por defecto
+    const taxAmount = createOrderDto.taxAmount || subtotal * 0.21; // 21% IVA
     const shippingAmount = createOrderDto.shippingAmount || 0;
     const discountAmount = createOrderDto.discountAmount || 0;
     const totalAmount = subtotal + taxAmount + shippingAmount - discountAmount;
@@ -124,13 +124,14 @@ export class OrderService {
         };
       }),
     };
-    await this.eventsService.sendCommand('stock.reserved', data);
     const orderCreated = await this.emitOrderCreated(order);
-
     const allOrder = {
       order,
       orderCreated,
     };
+    this.eventsService
+      .sendCommand('stock.reserved', data)
+      .catch((err) => this.logger.error(`error stock reserved ${err}`));
     return allOrder;
   }
   private async emitOrderCreated(order: any) {
