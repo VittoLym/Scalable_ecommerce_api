@@ -31,28 +31,23 @@ export class PaymentService {
     });
   }
   async createPayment(dto: CreatePaymentDto) {
-    const uwu = {
+    const links = {
       success: `${this.configService.get('API_URL')}/payment/success`,
       failure: `${this.configService.get('API_URL')}/payment/failure`,
       pending: `${this.configService.get('API_URL')}/payment/pending`,
     };
-    console.log(uwu);
     this.logger.log(
       `💳 Creando preferencia de pago para orden: ${dto.orderId}`,
     );
     try {
-      const order = await this.orderRabbitClient.getOrderById(dto.orderId);
-      if (!order) {
-        throw new NotFoundException(`Orden ${dto.orderId} no encontrada`);
-      }
       this.logger.log(
-        `📦 Orden encontrada: ${order.orderNumber} - Total: $${order.total}`,
+        `📦 Orden encontrada: ${dto.orderNumber} - Total: $${dto.amount}`,
       );
-      if (order.status === 'CONFIRMED') {
-        throw new NotFoundException(`Order Status is ${order.status}`);
+      if (dto.status === 'CONFIRMED') {
+        throw new NotFoundException(`Order Status is ${dto.status}`);
       }
       const totalAmount =
-        typeof order.total === 'string' ? Number(order.total) : order.total;
+        typeof dto.amount === 'string' ? Number(dto.amount) : dto.amount;
       const preference = new Preference(this.client);
       const response = await preference.create({
         body: {
@@ -65,23 +60,19 @@ export class PaymentService {
               quantity: 1,
               unit_price: totalAmount || dto.amount,
               currency_id: 'ARS',
-              description: `Pago de orden #${order.orderNumber || dto.orderId}`,
+              description: `Pago de orden #${dto.orderId || '002'}`,
             },
           ],
           payer: {
             email: 'test_user_7458615897109620776@testuser.com',
           },
-          back_urls: {
-            success: `${this.configService.get('API_URL')}/payment/success`,
-            failure: `${this.configService.get('API_URL')}/payment/failure`,
-            pending: `${this.configService.get('API_URL')}/payment/pending`,
-          },
+          back_urls: links,
           auto_return: 'approved',
           external_reference: dto.orderId,
           notification_url: `${this.configService.get('API_URL')}/payment/webhook`,
           metadata: {
             orderId: dto.orderId,
-            orderNumber: order.orderNumber,
+            orderNumber: dto.orderNumber,
           },
         },
       });
@@ -90,7 +81,7 @@ export class PaymentService {
         checkoutUrl: response.init_point,
         preferenceId: response.id,
         orderId: dto.orderId,
-        orderNumber: order.orderNumber,
+        orderNumber: dto.orderNumber,
       };
     } catch (error) {
       this.logger.error(`❌ Error creando pago: ${error.message}`, error.stack);

@@ -85,20 +85,22 @@ export class OrderService {
         contactPhone: createOrderDto.contactPhone,
         status: OrderStatus.PENDING,
         items: {
-          create: productInventory.map((item) => {
-            if (item.tAStock != true) return;
-            return {
-              productId: item.id,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-              productSnapshot: item.productSnapshot || {
-                productId: item.productId,
-                name: item.productName || 'Producto',
-                price: item.unitPrice,
-              },
-            };
-          }),
+          create: productInventory
+            .map((item) => {
+              if (item.tAStock !== true) return null; // Marcamos para eliminar o retornamos null
+              return {
+                productId: item.id,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice,
+                productSnapshot: item.productSnapshot || {
+                  productId: item.productId,
+                  name: item.productName || 'Producto',
+                  price: item.unitPrice,
+                },
+              };
+            })
+            .filter((item) => item !== null), // 👈 ESTO ELIMINA LOS UNDEFINED/NULL
         },
         statusHistory: {
           create: {
@@ -126,8 +128,8 @@ export class OrderService {
     };
     const orderCreated = await this.emitOrderCreated(order);
     const allOrder = {
-      order,
       orderCreated,
+      order,
     };
     this.eventsService
       .sendCommand('stock.reserved', data)
@@ -160,12 +162,14 @@ export class OrderService {
       }),
       shippingAddress: order.shippingAddress,
       createdAt: order.createdAt,
+      status: order.status,
     };
     this.logger.log(`📢 Emitting order.created event for order ${order.id}`);
     const orderCreated = await this.eventsService.emitEvent(
       'order.created',
       eventData,
     );
+    console.log(orderCreated);
     return orderCreated;
   }
   private async checkInventory(orderId: string, items: any[]) {

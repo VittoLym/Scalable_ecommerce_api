@@ -146,6 +146,7 @@ export class PaymentController {
   @MessagePattern('order.created')
   async handleOrderCreated(pattern: string, @Payload() data: any) {
     this.logger.log('🔥🔥🔥 EVENTO RECIBIDO 🔥🔥🔥');
+    this.logger.log(data);
     try {
       const productList = data.items.map((item) =>
             `  • ${item.quantity}x ${item.name || item.productId}`)
@@ -155,6 +156,7 @@ export class PaymentController {
         amount: data.totalAmount,
         orderId: data.orderId,
         description,
+        status: data.status
       };
       const result = await this.paymentService.createPayment(createPaymentDto);
       this.logger.log(`✅ Pago creado para orden ${data.orderId}`);
