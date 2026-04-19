@@ -11,6 +11,31 @@ import { Product } from '@prisma/client';
 export class ProductService {
   constructor(private prisma: PrismaService) {}
   private readonly logger = new Logger(ProductService.name);
+
+  private normalizeReservationItems(
+    items: { productId: string; quantity: number }[],
+  ) {
+    const aggregated = new Map<string, number>();
+
+    for (const item of items) {
+      if (!item.productId) {
+        throw new Error('productId es requerido para reservar stock');
+      }
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        throw new Error(`Cantidad invalida para el producto: ${item.productId}`);
+      }
+
+      aggregated.set(
+        item.productId,
+        (aggregated.get(item.productId) || 0) + item.quantity,
+      );
+    }
+
+    return Array.from(aggregated.entries())
+      .map(([productId, quantity]) => ({ productId, quantity }))
+      .sort((a, b) => a.productId.localeCompare(b.productId));
+  }
+
   async findAll(filterDto: FilterProductDto) {
     const {
       search,
@@ -63,6 +88,7 @@ export class ProductService {
       },
     };
   }
+
   async create(dto: CreateProductDto) {
     try {
       const productData = {
@@ -89,10 +115,11 @@ export class ProductService {
       return {
         success: false,
         error: 'Error creating product',
-        details: error.message
+        details: error.message,
       };
     }
   }
+
   async findById(id: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
@@ -104,6 +131,7 @@ export class ProductService {
 
     return product;
   }
+
   async update(id: string, dto: UpdateProductDto) {
     await this.findById(id);
 
@@ -112,6 +140,7 @@ export class ProductService {
       data: dto,
     });
   }
+
   async remove(id: string) {
     await this.findById(id);
     return this.prisma.product.update({
@@ -121,6 +150,7 @@ export class ProductService {
       },
     });
   }
+
   async checkDatabaseConnection(): Promise<boolean> {
     if (!this.prisma) {
       console.error('Prisma is undefined in checkDatabaseConnection');
@@ -134,7 +164,6 @@ export class ProductService {
       throw new Error('Database connection failed');
     }
   }
-  // ============= MÉTODOS PARA CATEGORÍAS =============
 
   async findByCategories(categoryIds: string[]): Promise<Product[]> {
     return this.prisma.product.findMany({
@@ -157,6 +186,7 @@ export class ProductService {
       },
     });
   }
+
   async existsInCategory(categoryId: string): Promise<boolean> {
     const count = await this.prisma.product.count({
       where: {
@@ -166,6 +196,7 @@ export class ProductService {
     });
     return count > 0;
   }
+
   async countByCategory(categoryId: string): Promise<number> {
     return this.prisma.product.count({
       where: {
@@ -174,6 +205,7 @@ export class ProductService {
       },
     });
   }
+
   async getProductsByCategory(
     categoryId: string,
     page: number = 1,
@@ -221,6 +253,7 @@ export class ProductService {
       limit,
     };
   }
+
   async getCategoryProductStats(categoryId: string): Promise<any> {
     const [totalProducts, activeProducts, totalValue, averagePrice] =
       await Promise.all([
@@ -261,27 +294,27 @@ export class ProductService {
       averagePrice: averagePrice._avg.price || 0,
     };
   }
+
   async verifyStock(orders: {
     orderId: string;
     items: { productId: string; quantity: number }[];
   }) {
+    const items = this.normalizeReservationItems(orders.items);
     const products = await Promise.all(
-      orders.items.map(async (i) => {
+      items.map(async (i) => {
         const product = await this.prisma.product.findFirst({
           where: { id: i.productId },
         });
         if (product === null) {
           throw new Error('No hay producto disponible');
         }
-        if (product.reserved > i.quantity) {
-          throw new Error('No se pueden reservar estos productos');
-        }
-        if (product?.stock != undefined && product?.stock < i.quantity)
+        if (product.stock < i.quantity) {
           return {
             id: product.id,
             name: product.name,
             tAStock: false,
           };
+        }
         return {
           id: product.id,
           name: product.name,
@@ -295,46 +328,65 @@ export class ProductService {
     );
     return products;
   }
+
   async reservedStock(data: {
     orderId: string;
     items: { productId: string; quantity: number }[];
   }) {
-    const { orderId, items } = data;
+    const { orderId } = data;
+    const items = this.normalizeReservationItems(data.items);
+
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const reservationPromises = items.map(async (item) => {
-          const updatedProduct = await tx.product.update({
-            where: { id: item.productId },
+        const reservations: Awaited<
+          ReturnType<typeof tx.stockReservation.create>
+        >[] = [];
+
+        for (const item of items) {
+          const updatedRows = await tx.product.updateMany({
+            where: {
+              id: item.productId,
+              stock: {
+                gte: item.quantity,
+              },
+            },
             data: {
               stock: {
                 decrement: item.quantity,
               },
+              reserved: {
+                increment: item.quantity,
+              },
             },
           });
-          if (updatedProduct.stock < 0) {
+
+          if (updatedRows.count !== 1) {
             throw new Error(
               `Stock insuficiente para el producto: ${item.productId}`,
             );
           }
-          return tx.stockReservation.create({
+
+          const reservation = await tx.stockReservation.create({
             data: {
               productId: item.productId,
-              orderId: orderId, // 👈 Usamos el ID que viene en la raíz del objeto
+              orderId,
               quantity: item.quantity,
               status: 'PENDING',
               expiresAt: new Date(Date.now() + 15 * 60 * 1000),
             },
           });
-        });
-        const results = await Promise.all(reservationPromises);
+
+          reservations.push(reservation);
+        }
+
         this.logger.log(
-          `✅ ${results.length} productos reservados para la orden ${orderId}`,
+          `Reserva segura creada para ${reservations.length} productos en la orden ${orderId}`,
         );
-        return results;
+        return reservations;
       });
     } catch (error) {
       this.logger.error(
-        `❌ Error en reserva masiva para orden ${orderId}: ${error.message}`
+        `Error en reserva masiva para orden ${orderId}: ${error.message}`,
       );
       throw error;
     }

@@ -35,6 +35,58 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
   private users = [];
+  private getRefreshTokenTtlMs(): number {
+    const expiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+    const match = /^(\d+)([smhd])$/.exec(expiresIn);
+
+    if (!match) {
+      return 7 * 24 * 60 * 60 * 1000;
+    }
+
+    const value = Number(match[1]);
+    const unit = match[2];
+    const multipliers: Record<string, number> = {
+      s: 1000,
+      m: 60 * 1000,
+      h: 60 * 60 * 1000,
+      d: 24 * 60 * 60 * 1000,
+    };
+
+    return value * multipliers[unit];
+  }
+  private getRefreshTokenExpiryDate(): Date {
+    return new Date(Date.now() + this.getRefreshTokenTtlMs());
+  }
+  private async findActiveSessionByRefreshToken(
+    userId: string,
+    refreshToken: string,
+  ) {
+    const sessions = await this.prisma.userSession.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    for (const session of sessions) {
+      if (!session.refreshToken) {
+        continue;
+      }
+
+      const match = await bcrypt.compare(refreshToken, session.refreshToken);
+      if (match) {
+        return session;
+      }
+    }
+
+    return null;
+  }
   async findByToken(auth: string) {
     const token = auth.split(' ')[1];
     if (auth.length < 6) {
@@ -168,11 +220,8 @@ export class AuthService {
         jti,
       };
       const [accessToken, refreshToken] = await Promise.all([
-        this.jwtService.signAsync(payload),
-        this.jwtService.signAsync(payload, {
-          secret: process.env.JWT_REFRESH_SECRET,
-          expiresIn: '7d',
-        }),
+        Promise.resolve(this.generateAccessToken(payload)),
+        Promise.resolve(this.generateRefreshToken(payload)),
       ]);
       const hashedRefresh = await bcrypt.hash(refreshToken, 10);
       await this.prisma.$transaction(async (tx) => {
@@ -184,7 +233,7 @@ export class AuthService {
             ipAddress: ip,
             userAgent,
             accessJti: jti,
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            expiresAt: this.getRefreshTokenExpiryDate(),
           },
         });
         await tx.user.update({
@@ -257,52 +306,60 @@ export class AuthService {
       }
       throw error;
     }
-    const tokens = await this.prisma.userSession.findMany({
+    if (!payload?.sub) {
+      throw new UnauthorizedException('Refresh token invÃ¡lido');
+    }
+    if (payload.tokenType && payload.tokenType !== 'refresh') {
+      throw new UnauthorizedException('Tipo de token invÃ¡lido');
+    }
+
+    const stored = await this.findActiveSessionByRefreshToken(
+      payload.sub,
+      oldRefreshToken,
+    );
+
+    if (!stored) {
+      throw new UnauthorizedException('Refresh token invÃ¡lido o revocado');
+    }
+
+    const user = await this.prisma.user.findFirst({
       where: {
-        userId: payload.sub,
-        revokedAt: null,
+        id: stored.userId,
+        deletedAt: null,
       },
     });
-    for (const stored of tokens) {
-      const match = await bcrypt.compare(oldRefreshToken, stored.refreshToken);
-      if (!match) continue;
-      const user = await this.prisma.user.findFirst({
-        where: {
-          id: stored.userId,
-        },
-      });
-      if (!user) {
-        throw new UnauthorizedException('User not found');
-      }
-      const session = await this.prisma.userSession.findFirst({
-        where: {
-          userId: stored.userId,
-        },
-      });
-      const pl = {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        jti: session?.accessJti,
-      };
-      const newAccessToken = this.generateAccessToken(pl);
-      const newRefreshToken = this.generateRefreshToken(pl);
-      await this.prisma.userSession.update({
-        where: {
-          id: stored.id,
-        },
-        data: {
-          token: await bcrypt.hash(newRefreshToken, 10),
-          userId: user.id,
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-        },
-      });
-      return {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-      };
+    if (!user) {
+      throw new UnauthorizedException('User not found');
     }
-    throw new UnauthorizedException();
+
+    const newJti = randomUUID();
+    const pl = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      jti: newJti,
+    };
+    const newAccessToken = this.generateAccessToken(pl);
+    const newRefreshToken = this.generateRefreshToken(pl);
+    const hashedRefreshToken = await bcrypt.hash(newRefreshToken, 10);
+
+    await this.prisma.userSession.update({
+      where: {
+        id: stored.id,
+      },
+      data: {
+        token: newAccessToken,
+        refreshToken: hashedRefreshToken,
+        accessJti: newJti,
+        lastActiveAt: new Date(),
+        expiresAt: this.getRefreshTokenExpiryDate(),
+      },
+    });
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
   }
   async verifyEmail(token: string) {
     const user = await this.prisma.user.findFirst({
@@ -335,21 +392,38 @@ export class AuthService {
     return { message: 'Email verified successfully' };
   }
   async logout(refreshToken: string) {
-    const tokens = await this.prisma.userSession.findMany();
-    for (const stored of tokens) {
-      const match = await bcrypt.compare(refreshToken, stored.token);
-      if (!match) continue;
-      const user = stored.id;
-      await this.prisma.userSession.updateMany({
+    try {
+      const payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+
+      if (!payload?.sub) {
+        return { ok: true };
+      }
+
+      const stored = await this.findActiveSessionByRefreshToken(
+        payload.sub,
+        refreshToken,
+      );
+
+      if (!stored) {
+        return { ok: true };
+      }
+
+      await this.prisma.userSession.update({
         where: {
-          id: user,
-          revokedAt: null,
+          id: stored.id,
         },
         data: {
           revokedAt: new Date(),
+          lastActiveAt: new Date(),
         },
       });
+    } catch (error) {
+      this.logger.warn(`No se pudo revocar la sesiÃ³n en logout: ${error.message}`);
     }
+
+    return { ok: true };
   }
   private generateAccessToken(payload: any) {
     return this.jwtService.sign(payload, {
