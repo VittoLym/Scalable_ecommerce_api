@@ -27,12 +27,12 @@ Each service:
 
 ## ⚙️ Tech Stack
 
-* Node.js / TypeScript
-* Prisma ORM
-* RabbitMQ (event-driven communication)
-* Redis (shared infra)
-* Docker & Docker Compose
-
+- Node.js / TypeScript, NestJS
+- Prisma ORM, PostgreSQL
+- RabbitMQ (event-driven communication)
+- Redis (shared infra)
+- Jest (unit tests), GitHub Actions (CI)
+- Docker & Docker Compose
 ---
 
 ## 🧩 Key Engineering Concepts
@@ -81,14 +81,32 @@ This project is not presented as “perfect”, but as an evolving system.
 
 ---
 
+## 🧪 Testing
+
+Unit tests run with Jest and execute on every push through GitHub Actions.
+
+```bash
+cd order-service && npm test
+cd product-service && npm test
+```
+
+Currently covered:
+
+- **order-service**: idempotent order creation, order status transitions and permissions, payment flows
+- **product-service**: atomic stock reservation (conditional update inside a transaction), reservation expiry, input validation
+
+Known issues found while writing the tests are documented as pending tests (`it.todo`) in `order.service.spec.ts`.
+
+---
+
 ## 📈 Roadmap
 
 * [ ] Refactor OrderService into modular use-case services
 * [ ] Implement Saga pattern for checkout flow
 * [ ] Standardize event contracts across services
 * [ ] Add structured logging & tracing
-* [ ] Improve test coverage (integration tests)
-
+* [x] Unit tests and CI for order and product services
+* [ ] Integration tests with a real PostgreSQL (concurrent stock reservations)
 ---
 
 ## 🧠 Why This Project Exists
