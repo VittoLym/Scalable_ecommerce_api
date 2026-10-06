@@ -121,6 +121,28 @@ This one focuses on:
 
 ---
 
+## 🤖 How I used AI in this project
+
+I want to be transparent about where AI helped and where it did not.
+
+**Written and decided by me**
+- The data models and the Prisma setup, including the `adapter-pg` configuration.
+- The architecture and the structure of every microservice.
+- The business logic in the service layer: order lifecycle, idempotent order creation, atomic stock reservation and the auth/session flows.
+
+**Delegated to AI**
+- **ChatGPT**, as a consultant for questions and repetitive tasks. The controllers were generated from the functionality I described for each microservice, because they are repetitive boilerplate. The services behind them are mine.
+- **Claude**, to draft the unit tests, the GitHub Actions workflow and parts of the documentation from my existing code.
+
+**How I verified it**
+- I reviewed the generated controllers and checked that they do what I specified. Most of them were usable as generated, with small adjustments where needed.
+- I ran the unit tests locally and in CI (GitHub Actions) before merging.
+- Writing the tests exposed real issues in my own code. I kept them visible as pending tests (`it.todo`) instead of hiding them, and they are tracked in the roadmap.
+
+Agent instructions for this repo are in [`AGENTS.md`](./AGENTS.md).
+
+---
+
 ## 📌 Dev Philosophy
 
 > “Building systems that reflect real-world complexity, not tutorial simplicity.”
