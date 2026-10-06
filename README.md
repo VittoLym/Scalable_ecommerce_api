@@ -5,7 +5,8 @@ A distributed e-commerce backend designed to explore **real-world scalability ch
 This project focuses on building and evolving a **microservices-based system** with practical engineering decisions such as idempotency, event-driven communication, and concurrency-safe inventory handling.
 
 ---
-
+   ![CI](https://github.com/VittoLym/Scalable_ecommerce_api/actions/workflows/ci.yml/badge.svg)
+---
 ## 🚀 Architecture Overview
 
 The system is structured into domain-driven services:
