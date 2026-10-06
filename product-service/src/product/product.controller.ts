@@ -18,7 +18,7 @@ import { FilterProductDto } from '../dto/filter-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
 import { ClientProxy } from '@nestjs/microservices';
-import { RedisService } from 'src/redis/redis.service';
+import { RedisService } from '../redis/redis.service';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { Logger } from '@nestjs/common';
 
