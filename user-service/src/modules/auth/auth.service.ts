@@ -35,6 +35,17 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
   private users = [];
+  private getRefreshTokenSecret(): string {
+    const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+
+    if (!secret) {
+      throw new InternalServerErrorException(
+        'JWT refresh secret is not configured',
+      );
+    }
+
+    return secret;
+  }
   private getRefreshTokenTtlMs(): number {
     const expiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
     const match = /^(\d+)([smhd])$/.exec(expiresIn);
@@ -87,27 +98,65 @@ export class AuthService {
 
     return null;
   }
+  
   async findByToken(auth: string) {
-    const token = auth.split(' ')[1];
-    if (auth.length < 6) {
-      console.warn('is not token', auth);
+    if (!auth?.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Token no proporcionado');
     }
-    const user = await this.prisma.$transaction(async (tx) => {
-      const userss = await tx.userSession.findFirst({
-        where: { token },
+
+    const token = auth.slice(7).trim();
+
+    if (!token) {
+      throw new UnauthorizedException('Token no proporcionado');
+    }
+
+    let payload: any;
+
+    try {
+      payload = await this.jwtService.verifyAsync(token, {
+        secret: process.env.JWT_SECRET,
       });
-      return await tx.user.findFirst({
-        where: {
-          id: userss?.userId,
-        },
-      });
+    } catch {
+      throw new UnauthorizedException('Token inválido o expirado');
+    }
+
+    if (!payload?.sub) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    const session = await this.prisma.userSession.findFirst({
+      where: {
+        token,
+        userId: payload.sub,
+        revokedAt: null,
+      },
     });
-    return user;
+
+    if (!session) {
+      throw new UnauthorizedException('Sesión inválida o revocada');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: payload.sub,
+        deletedAt: null,
+      },
+      include: {
+        profile: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    return this.toResponse(user);
   }
   async findByEmail(email: string) {
     const user = await this.prisma.user.findFirst({
       where: {
         email: email,
+        deletedAt: null,
       },
     });
     return user;
@@ -136,13 +185,19 @@ export class AuthService {
     }
     const verificationToken = randomBytes(32).toString('hex');
     const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    const verificationDisplayName =
+      [userData.firstName, userData.lastName]
+        .filter((value): value is string => Boolean(value?.trim()))
+        .map((value) => value.trim())
+        .join(' ') || 'usuario';
+
     const user = await this.prisma.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
         data: {
           email: userData.email,
           password: hashedPassword,
           authProvider: userData.authProvider ?? AuthProvider.LOCAL,
-          role: userData.role ?? Role.USER,
+          role: Role.USER,
           emailVerified: false,
           verificationToken,
           verificationExpiresAt,
@@ -172,7 +227,7 @@ export class AuthService {
     await this.emailService.sendVerificationEmail(
       userData.email,
       verificationToken,
-      `${userData.firstName} ${userData.lastName}`.trim() || 'usuario',
+      verificationDisplayName,
     );
     return this.toResponse(user);
   }
@@ -182,11 +237,19 @@ export class AuthService {
   }
   async validateUser(email: string, password: string) {
     const user = await this.findByEmail(email);
-    if (user && await bcrypt.compare(password, user.password)) {
-      const { password, ...result } = user;
-      return result;
+    if (!user || !user.password) {
+      return null;
     }
-    return null;
+
+    const isValid = await bcrypt.compare(password, user.password);
+
+    if (!isValid) {
+      return null;
+    }
+
+    const { password: _, ...result } = user;
+
+    return result;
   }
   async login(data: LoginUserDto, ip?: string, userAgent?: string) {
     try {
@@ -285,11 +348,10 @@ export class AuthService {
   }
   async refresh(oldRefreshToken: string) {
     const decoded = this.jwtService.decode(oldRefreshToken);
-    console.log('📦 Token decodificado (sin verificar):', decoded);
     let payload: any;
     try {
       payload = await this.jwtService.verifyAsync(oldRefreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET,
+        secret: this.getRefreshTokenSecret(),
       });
     } catch (error) {
       console.error('❌ Error en refresh:', {
@@ -307,10 +369,10 @@ export class AuthService {
       throw error;
     }
     if (!payload?.sub) {
-      throw new UnauthorizedException('Refresh token invÃ¡lido');
+      throw new UnauthorizedException('Refresh token inválido');
     }
     if (payload.tokenType && payload.tokenType !== 'refresh') {
-      throw new UnauthorizedException('Tipo de token invÃ¡lido');
+      throw new UnauthorizedException('Tipo de token inválido');
     }
 
     const stored = await this.findActiveSessionByRefreshToken(
@@ -319,7 +381,7 @@ export class AuthService {
     );
 
     if (!stored) {
-      throw new UnauthorizedException('Refresh token invÃ¡lido o revocado');
+      throw new UnauthorizedException('Refresh token inválido o revocado');
     }
 
     const user = await this.prisma.user.findFirst({
@@ -394,7 +456,7 @@ export class AuthService {
   async logout(refreshToken: string) {
     try {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET,
+        secret: this.getRefreshTokenSecret(),
       });
 
       if (!payload?.sub) {
@@ -420,7 +482,7 @@ export class AuthService {
         },
       });
     } catch (error) {
-      this.logger.warn(`No se pudo revocar la sesiÃ³n en logout: ${error.message}`);
+      this.logger.warn(`No se pudo revocar la sesión en logout: ${error.message}`);
     }
 
     return { ok: true };
@@ -432,19 +494,14 @@ export class AuthService {
     });
   }
   private generateRefreshToken(payload: any) {
-    console.log('🔍 generateRefreshToken - payload recibido:', payload);
     const token = this.jwtService.sign(
       { ...payload, tokenType: 'refresh' },
       {
-        secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+        secret: this.getRefreshTokenSecret(),
         expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' as any,
       },
     );
     const decoded = this.jwtService.decode(token);
-    console.log(
-      '🔍 generateRefreshToken - token generado (decodificado):',
-      decoded,
-    );
     return token;
   }
   async sendPasswordResetEmail(email: string): Promise<void> {

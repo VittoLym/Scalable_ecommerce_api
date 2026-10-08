@@ -304,6 +304,16 @@ describe('AuthService', () => {
       expect(error.getStatus()).toBe(500);
     });
 
+    it('fails with a 500 and creates no session when no JWT secret is configured', async () => {
+      delete process.env.JWT_REFRESH_SECRET;
+      delete process.env.JWT_SECRET;
+
+      const error = await service.login(dto).catch((e) => e);
+
+      expect(error.getStatus()).toBe(500);
+      expect(prismaMock.userSession.create).not.toHaveBeenCalled();
+    });
+
     it.todo(
       'does not reveal whether an email is verified before the password is checked (account enumeration)',
     );
@@ -410,10 +420,7 @@ describe('AuthService', () => {
       expect(prismaMock.userSession.update).not.toHaveBeenCalled();
     });
 
-    // KNOWN BUG: login() signs refresh tokens with JWT_REFRESH_SECRET || JWT_SECRET,
-    // but refresh() verifies with JWT_REFRESH_SECRET only, so it breaks when that
-    // variable is not set.
-    it.failing('verifies with the same fallback secret login() signs with', async () => {
+    it('verifies with the same fallback secret login() signs with', async () => {
       delete process.env.JWT_REFRESH_SECRET;
 
       await service.refresh(OLD);
@@ -421,6 +428,16 @@ describe('AuthService', () => {
       expect(jwtMock.verifyAsync).toHaveBeenCalledWith(OLD, {
         secret: 'test-access-secret',
       });
+    });
+
+    it('fails with a 500 when no JWT secret is configured at all', async () => {
+      delete process.env.JWT_REFRESH_SECRET;
+      delete process.env.JWT_SECRET;
+
+      await expect(service.refresh(OLD)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
+      expect(prismaMock.userSession.findMany).not.toHaveBeenCalled();
     });
 
     it.todo(
@@ -624,22 +641,25 @@ describe('AuthService', () => {
       expect(persisted.authProvider).toBe(AuthProvider.GITHUB);
     });
 
-    // KNOWN BUG: `${firstName} ${lastName}`.trim() is "undefined undefined" when the
-    // names are missing, so the `|| 'usuario'` fallback can never trigger.
-    it.failing('greets the user as "usuario" when no name was given', async () => {
-      await service.create({ email: 'anon@example.com', password: 'Secret123' }, '1.2.3.4');
+    it.each([
+      ['no name at all', {}, 'usuario'],
+      ['only a first name', { firstName: 'Ana' }, 'Ana'],
+      ['blank names', { firstName: '  ', lastName: ' ' }, 'usuario'],
+    ])('addresses the verification email correctly with %s', async (_label, names, expected) => {
+      await service.create(
+        { email: 'anon@example.com', password: 'Secret123', ...names },
+        '1.2.3.4',
+      );
 
       expect(emailMock.sendVerificationEmail).toHaveBeenCalledWith(
         'anon@example.com',
         expect.any(String),
-        'usuario',
+        expected,
       );
     });
 
-    // KNOWN ISSUE (needs a product decision): POST /auth/register is public and
-    // RegisterDto accepts `role`, which create() persists as given, so anyone can
-    // self-register as ADMIN.
-    it.failing('ignores a client-supplied role on public registration', async () => {
+    // POST /auth/register is public and RegisterDto accepts `role`: it must never be honoured
+    it('ignores a client-supplied role on public registration', async () => {
       await service.create({ ...data, role: Role.ADMIN }, '1.2.3.4');
 
       const { data: persisted } = prismaMock.user.create.mock.calls[0][0];
@@ -678,16 +698,14 @@ describe('AuthService', () => {
       await expect(service.validateUser('ghost@example.com', 'Secret123')).resolves.toBeNull();
     });
 
-    // KNOWN BUG: OAuth users have password = null and it is passed straight to bcrypt.compare
-    it.failing('does not call bcrypt with a null hash for OAuth accounts', async () => {
+    it('returns null for OAuth accounts without calling bcrypt', async () => {
       prismaMock.user.findFirst.mockResolvedValue({ ...USER, password: null });
 
       await expect(service.validateUser(USER.email, 'Secret123')).resolves.toBeNull();
       expect(bcryptMock.compare).not.toHaveBeenCalled();
     });
 
-    // KNOWN BUG: findByEmail does not filter deletedAt, unlike login()
-    it.failing('does not authenticate soft-deleted users', async () => {
+    it('only looks up users that are not soft-deleted', async () => {
       prismaMock.user.findFirst.mockResolvedValue(null);
 
       await service.validateUser(USER.email, 'Secret123');
@@ -700,38 +718,87 @@ describe('AuthService', () => {
 
   // ---------------------------------------------------------- findByToken
   describe('findByToken', () => {
-    it('resolves the user that owns the bearer token', async () => {
-      prismaMock.userSession.findFirst.mockResolvedValue({ userId: 'u1' });
-      prismaMock.user.findFirst.mockResolvedValue({ id: 'u1', email: USER.email });
+    const BEARER = 'Bearer abc123';
 
-      const result = await service.findByToken('Bearer abc123');
-
-      expect(prismaMock.userSession.findFirst).toHaveBeenCalledWith({
-        where: { token: 'abc123' },
+    beforeEach(() => {
+      jwtMock.verifyAsync.mockResolvedValue({ sub: 'u1' });
+      prismaMock.userSession.findFirst.mockResolvedValue({ id: 's1', userId: 'u1' });
+      prismaMock.user.findFirst.mockResolvedValue({
+        ...USER,
+        profile: { fullName: 'Ana Perez' },
       });
-      expect(prismaMock.user.findFirst).toHaveBeenCalledWith({ where: { id: 'u1' } });
-      expect(result).toEqual({ id: 'u1', email: USER.email });
     });
 
-    // KNOWN BUG (security): with no matching session the query becomes
-    // `where: { id: undefined }`, and Prisma treats undefined as "no filter", so the
-    // first user in the table is returned. This is exposed by the public POST /auth/validate.
-    it.failing('does not query users when no session matches the token', async () => {
+    it('resolves the user that owns a valid, non-revoked bearer token', async () => {
+      const result = await service.findByToken(BEARER);
+
+      expect(jwtMock.verifyAsync).toHaveBeenCalledWith('abc123', {
+        secret: 'test-access-secret',
+      });
+      expect(prismaMock.userSession.findFirst).toHaveBeenCalledWith({
+        where: { token: 'abc123', userId: 'u1', revokedAt: null },
+      });
+      expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+        where: { id: 'u1', deletedAt: null },
+        include: { profile: true },
+      });
+      expect(result).toMatchObject({ id: 'u1', email: USER.email });
+    });
+
+    it('never returns the password hash', async () => {
+      const result = await service.findByToken(BEARER);
+
+      expect(result).not.toHaveProperty('password');
+    });
+
+    it.each([
+      ['an empty header', ''],
+      ['a header without the Bearer scheme', 'abc123'],
+      ['a different scheme', 'Basic abc123'],
+      ['a Bearer header with no token', 'Bearer '],
+      ['a Bearer header with only spaces', 'Bearer    '],
+    ])('rejects %s without verifying anything', async (_label, header) => {
+      await expect(service.findByToken(header)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(jwtMock.verifyAsync).not.toHaveBeenCalled();
+    });
+
+    it('rejects a token that fails JWT verification before touching the database', async () => {
+      jwtMock.verifyAsync.mockRejectedValue(new Error('jwt expired'));
+
+      await expect(service.findByToken(BEARER)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(prismaMock.userSession.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejects a verified token that has no subject', async () => {
+      jwtMock.verifyAsync.mockResolvedValue({});
+
+      await expect(service.findByToken(BEARER)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(prismaMock.userSession.findFirst).not.toHaveBeenCalled();
+    });
+
+    // Regression: this used to query `where: { id: undefined }`, which Prisma treats
+    // as "no filter" and returned an arbitrary user.
+    it('rejects when no active session matches and never loads a user', async () => {
       prismaMock.userSession.findFirst.mockResolvedValue(null);
 
-      await service.findByToken('Bearer unknown');
-
+      await expect(service.findByToken(BEARER)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
       expect(prismaMock.user.findFirst).not.toHaveBeenCalled();
     });
 
-    // KNOWN BUG (security): the raw user row, including the password hash, is returned
-    it.failing('does not return the password hash', async () => {
-      prismaMock.userSession.findFirst.mockResolvedValue({ userId: 'u1' });
-      prismaMock.user.findFirst.mockResolvedValue(USER);
+    it('rejects when the user was soft-deleted', async () => {
+      prismaMock.user.findFirst.mockResolvedValue(null);
 
-      const result = await service.findByToken('Bearer abc123');
-
-      expect(result).not.toHaveProperty('password');
+      await expect(service.findByToken(BEARER)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
     });
   });
 
