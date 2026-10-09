@@ -19,9 +19,10 @@ The system is structured into domain-driven services:
 
 Each service:
 
-* owns its own database
 * communicates via HTTP + RabbitMQ
 * is containerized with Docker
+
+Data ownership: `user-service`, `product-service` and `order-service` each own a PostgreSQL database (Prisma). The gateway is stateless. `payment-service` has a database provisioned for upcoming payment persistence, but does not use it yet.
 
 ---
 
@@ -31,15 +32,46 @@ Each service:
 - Prisma ORM, PostgreSQL
 - RabbitMQ (event-driven communication)
 - Redis (shared infra)
+- MercadoPago for checkout (a Stripe service exists but is not wired into a module yet)
 - Jest (unit tests), GitHub Actions (CI)
 - Docker & Docker Compose
+---
+
+## ▶️ Getting started
+
+Requires Docker and Docker Compose.
+
+```bash
+# 1. Create the env files from the examples
+for s in gateway user-service product-service order-service payment-service; do cp $s/.env.example $s/.env; done
+# PowerShell: foreach ($s in 'gateway','user-service','product-service','order-service','payment-service') { Copy-Item "$s/.env.example" "$s/.env" }
+
+# 2. Set JWT_SECRET (gateway and user-service must share it) and JWT_REFRESH_SECRET (user-service)
+
+# 3. Start everything
+docker compose up --build
+```
+
+| Component | URL / port |
+|---|---|
+| Gateway | http://localhost:3000 |
+| user / product / order / payment service | 3001 / 3002 / 3003 / 3004 |
+| RabbitMQ management | http://localhost:15672 (guest / guest) |
+| PostgreSQL (user / product / order / payment) | 5433 / 5434 / 5435 / 5436 |
+
+Notes:
+
+- Email features (verification, password reset) need real SMTP credentials in `user-service/.env`.
+- Payments need MercadoPago credentials and a public `API_URL` (a tunnel such as ngrok when running locally).
+- To use a hosted PostgreSQL (for example Neon) instead of the local containers, put its URL in `DATABASE_URL` with `sslmode=require` and run compose with `PGSSLMODE=require`.
+
 ---
 
 ## 🧩 Key Engineering Concepts
 
 ### ✅ Idempotent Order Creation
 
-Prevents duplicate orders during retries or network issues.
+Prevents duplicate orders during retries or network issues. Known limitation: a race between the lookup and the insert under truly concurrent retries is documented as a pending test (`it.todo`).
 
 ### ✅ Product Snapshots in Orders
 
@@ -78,6 +110,7 @@ This project is not presented as “perfect”, but as an evolving system.
 * Fixed **refresh/logout token logic** (session consistency)
 * Implemented **atomic stock reservation** to prevent race conditions
 * Improved internal consistency of auth flows
+* Fixed auth gaps exposed by the user-service unit tests: `/auth/validate` now verifies the JWT and an active session, public registration ignores a client-supplied role, and refresh/logout share the same secret fallback
 
 ---
 
@@ -88,14 +121,16 @@ Unit tests run with Jest and execute on every push through GitHub Actions.
 ```bash
 cd order-service && npm test
 cd product-service && npm test
+cd user-service && npm test
 ```
 
 Currently covered:
 
 - **order-service**: idempotent order creation, order status transitions and permissions, payment flows
 - **product-service**: atomic stock reservation (conditional update inside a transaction), reservation expiry, input validation
+- **user-service**: `AuthService` (login, refresh token rotation, logout, email verification, registration, password reset, token validation) and `UserService`
 
-Known issues found while writing the tests are documented as pending tests (`it.todo`) in `order.service.spec.ts`.
+Known issues found while writing the tests are documented as pending tests (`it.todo`) in `order.service.spec.ts`. The auth defects found in user-service were fixed and kept as regression tests. `payment-service` and the gateway do not have unit tests yet.
 
 ---
 
@@ -105,7 +140,8 @@ Known issues found while writing the tests are documented as pending tests (`it.
 * [ ] Implement Saga pattern for checkout flow
 * [ ] Standardize event contracts across services
 * [ ] Add structured logging & tracing
-* [x] Unit tests and CI for order and product services
+* [x] Unit tests and CI for order, product and user services
+* [ ] Unit tests for payment-service and the gateway
 * [ ] Integration tests with a real PostgreSQL (concurrent stock reservations)
 ---
 

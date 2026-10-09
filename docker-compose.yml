@@ -81,9 +81,8 @@ services:
     env_file:
       - ./user-service/.env
     environment:
-      NODE_ENV: production
-      PGSSLMODE: require
-      PGCHANNELBINDING: require
+      NODE_ENV: development
+      PGSSLMODE: ${PGSSLMODE:-disable}
       # Services
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -101,6 +100,7 @@ services:
     volumes:
       - ./user-service:/app
       - /app/node_modules
+    command: sh -c "npx prisma migrate deploy && npm run start:dev"
 
   # -------------------------
   # PRODUCT SERVICE DATABASE
@@ -135,8 +135,7 @@ services:
       - "3002:3002"
     environment:
       NODE_ENV: development
-      PGSSLMODE: require
-      PGCHANNELBINDING: require
+      PGSSLMODE: ${PGSSLMODE:-disable}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_URL: redis://redis:6379
@@ -155,6 +154,7 @@ services:
     volumes:
       - ./product-service:/app
       - /app/node_modules
+    command: sh -c "npx prisma migrate deploy && npm run start:dev"
 
   # -------------------------
   # ORDER SERVICE DATABASE
@@ -189,8 +189,7 @@ services:
       - "3003:3003"
     environment:
       NODE_ENV: development
-      PGSSLMODE: require
-      PGCHANNELBINDING: require
+      PGSSLMODE: ${PGSSLMODE:-disable}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_URL: redis://redis:6379
@@ -215,6 +214,7 @@ services:
     volumes:
       - ./order-service:/app
       - /app/node_modules
+    command: sh -c "npx prisma migrate deploy && npm run start:dev"
 
     # -------------------------
   # PAYMENT DB
@@ -249,7 +249,6 @@ services:
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://rabbitmq:5672
       ORDER_SERVICE_URL: http://order-service:3003
-      API_URL: https://nontoxic-carly-obtundent.ngrok-free.dev
     depends_on:
       - payment-db
       - redis
@@ -277,6 +276,7 @@ services:
       PRODUCT_SERVICE_URL: http://product-service:3002
       ORDER_SERVICE_URL: http://order-service:3003
       PAYMENT_SERVICE_URL: http://payment-service:3004
+      CATEGORY_SERVICE_URL: http://product-service:3002
     depends_on:
       - user-service
       - product-service

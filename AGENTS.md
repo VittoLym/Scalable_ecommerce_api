@@ -28,7 +28,7 @@ npm run lint
 
 From the repository root: `docker compose up --build` starts the infrastructure and services.
 
-<!-- TODO: confirm that every service exposes the same npm scripts as order-service -->
+All five services expose `start:dev`, `lint` and `test`.
 
 ## Conventions
 
@@ -53,11 +53,13 @@ Ask first:
 Do not:
 - Commit `.env` files or any secret.
 - Replace the stock reservation in `product-service` with a read-then-write flow. It must stay a single conditional `updateMany` inside a transaction, because that is what prevents overselling.
-- Delete or silence `it.todo` and `it.failing` tests. They document known issues.
+- Delete or silence `it.todo` and `it.failing` tests. They document known issues. When the underlying bug is fixed, turn the test into a regular one instead of deleting it.
 
 ## Known issues
 
 Documented as pending tests in `order-service/src/order.service.spec.ts`: client-supplied prices used for totals, idempotency race condition, orders created without in-stock items, CSV export, ownership checks in `addItems` and `updateShippingAddress`, and soft-deleted orders still being returned.
+
+In `user-service`, the auth gaps found by the unit tests (token validation in `/auth/validate`, client-supplied role on public registration, refresh/login secret mismatch, null password hashes and soft-deleted users in `validateUser`) were fixed and are covered by regression tests. Some `it.todo` entries remain in `auth.service.spec.ts` and `user.service.spec.ts`.
 
 ## Division of work
 
