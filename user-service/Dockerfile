@@ -1,4 +1,4 @@
-# user-service/Dockerfile (CORREGIDO)
+# user-service/Dockerfile
 FROM node:20-alpine AS builder
 
 # Instalar git solo en builder (necesario para algunas dependencias)
